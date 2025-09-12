@@ -10,6 +10,7 @@ venv/
 .env
 .git/
 cert/
+dist
 
 # data
 test_data/
