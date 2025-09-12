@@ -1,0 +1,21 @@
+# tests
+.pytest_cache/
+htmlcov/
+.coverage
+
+# other
+__pycache__/
+*.egg-info/
+venv/
+.env
+.git/
+cert/
+
+# data
+test_data/
+
+# logging
+logging/
+
+#build
+build/

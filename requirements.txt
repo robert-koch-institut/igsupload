@@ -1,0 +1,6 @@
+requests
+python_dotenv
+pytest
+pytest-mock
+pytest-cov
+typer[all]
