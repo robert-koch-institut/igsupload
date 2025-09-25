@@ -1,10 +1,10 @@
-# IGS Upload
+# IGSUpload - CLI zum Upload von Daten für die Integrierte Genomische Surveillance
 
-Automated upload of sequencing data (FASTA, FASTQ, GZIP) to the DEMIS portal of the Robert Koch Institute (RKI).
+CLI for the upload of sequencing data (FASTQ, FASTQ.GZIP) using the DEMIS API of the Robert Koch Institute (RKI).
 
 ## Table of Contents
 
-- [IGS Upload](#igs-upload)
+- [IGSUpload - CLI zum Upload von Daten für die Integrierte Genomische Surveillance](#igsupload---cli-zum-upload-von-daten-für-die-integrierte-genomische-surveillance)
   - [Table of Contents](#table-of-contents)
   - [Description](#description)
   - [Requirements](#requirements)
@@ -59,6 +59,7 @@ cd igs-upload
 ```
 
 ### Set up the virtual environment
+
 There are different ways of creating a virtual environment.
 Setup with **venv**:
 
@@ -89,6 +90,7 @@ pip install .
 ```
 
 ---
+
 ### Optional (Developers only)
 
 ```bash
@@ -96,6 +98,7 @@ pip install -e .[dev]
 ```
 
 ---
+
 ### Configure credentials (.env)
 
 Modify the .env file with your credentials. Use the **.env.template** file as a template for yours:
