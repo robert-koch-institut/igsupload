@@ -176,12 +176,12 @@ igs-upload/
 │       ├── validate.py                   # Helper validation functions
 │       ├── workflow.py                   # Main project workflow
 │       └── main.py                       # Entry point (CLI)
-├── test_data/
+├── data/
 │   ├── metadata/
-│   │   └── test_data.csv
+│   │   └── IGS_metadata_test_data.csv
 │   └── reads/
-│       ├── sample_R1.fastq
-│       └── sample_R2.fastq
+│       ├── Sample12346_R1.fastq
+│       └── Sample12346_R2.fastq
 ├── tests/                                # unit tests
 ├── .env
 ├── setup.py                              # for pip
