@@ -7,10 +7,12 @@ htmlcov/
 __pycache__/
 *.egg-info/
 venv/
+.venv/
 .env
 .git/
 cert/
 dist
+igs-upload-config/
 
 # data
 test_data/
@@ -20,3 +22,6 @@ logging/
 
 #build
 build/
+
+# macOS
+.DS_Store
