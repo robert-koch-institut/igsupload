@@ -12,6 +12,9 @@ from igsupload.extract_csv import CsvRow
 IGS_SPEC_BASE = "https://demis.rki.de/fhir/igs"
 NOTIFICATION_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationId"
 NOTIFICATION_BUNDLE_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationBundleId"
+NOTIFIED_PERSON_ANONYMOUS_PROFILE = "https://demis.rki.de/fhir/StructureDefinition/NotifiedPersonAnonymous"
+ADDRESS_USE_EXTENSION = "https://demis.rki.de/fhir/StructureDefinition/AddressUse"
+ADDRESS_USE_SYSTEM = "https://demis.rki.de/fhir/CodeSystem/addressUse"
 
 
 def _fhir_base() -> str:
@@ -264,19 +267,19 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     patient_resource = {
         'resourceType': 'Patient',
         'id': patient_id,
-        'meta': {'profile': ['https://demis.rki.de/fhir/StructureDefinition/NotifiedPersonNotByName']},
+        'meta': {'profile': [NOTIFIED_PERSON_ANONYMOUS_PROFILE]},
         **({'gender': gender} if gender else {}),
         **({'birthDate': birth_date} if birth_date else {}),
-        "address": [{
+        **({"address": [{
             "extension": [{
-                "url": "https://demis.rki.de/fhir/StructureDefinition/AddressUse",
+                "url": ADDRESS_USE_EXTENSION,
                 "valueCoding": {
-                    "system": "https://demis.rki.de/fhir/CodeSystem/addressUse",
+                    "system": ADDRESS_USE_SYSTEM,
                     "code": "primary"
                 }
             }],
-            **({'postalCode': geo_postal} if geo_postal else {})
-        }]
+            "postalCode": geo_postal
+        }]} if geo_postal else {})
     }
 
     patient_entry = {
