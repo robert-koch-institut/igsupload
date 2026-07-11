@@ -10,6 +10,8 @@ import igsupload.get_token as token_module
 from igsupload.extract_csv import CsvRow
 
 IGS_SPEC_BASE = "https://demis.rki.de/fhir/igs"
+NOTIFICATION_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationId"
+NOTIFICATION_BUNDLE_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationBundleId"
 
 
 def _fhir_base() -> str:
@@ -57,6 +59,25 @@ def _valid_email(e: str) -> bool:
     return bool(s and "@" in s and "." in s.split("@")[-1])
 
 
+def _required_uuid(value: str, field_name: str) -> str:
+    """Return a canonical UUID or fail early for a required DEMIS identifier."""
+    candidate = _nz(value)
+    if not candidate:
+        raise ValueError(f"{field_name} must contain a UUID")
+    try:
+        return str(uuid.UUID(candidate))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(f"{field_name} must contain a valid UUID") from exc
+
+
+def _new_uuid_excluding(*excluded_values: str) -> str:
+    excluded = set(excluded_values)
+    while True:
+        candidate = str(uuid.uuid4())
+        if candidate not in excluded:
+            return candidate
+
+
 def _prune(obj):
     if isinstance(obj, dict):
         cleaned = {}
@@ -101,6 +122,15 @@ SEQ_REASON_TO_SNOMED = {
 
 
 def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
+    referenced_notification_id = _required_uuid(
+        row.DEMIS_NOTIFICATION_ID,
+        "DEMIS_NOTIFICATION_ID",
+    )
+    notification_id = _new_uuid_excluding(referenced_notification_id)
+    notification_bundle_id = _new_uuid_excluding(
+        referenced_notification_id,
+        notification_id,
+    )
     now_iso = datetime.now(timezone.utc).isoformat()
     patient_id = str(uuid.uuid4())
     organization_id = str(uuid.uuid4())
@@ -559,14 +589,14 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
 
     # --- Composition ---
     composition_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Composition/{row.DEMIS_NOTIFICATION_ID}',
+        'fullUrl': f'{IGS_SPEC_BASE}/Composition/{notification_id}',
         'resource': {
             'resourceType': 'Composition',
-            'id': row.DEMIS_NOTIFICATION_ID,
+            'id': notification_id,
             'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/NotificationSequence']},
             'identifier': {
-                'system': 'https://demis.rki.de/fhir/NamingSystem/NotificationId',
-                'value': row.DEMIS_NOTIFICATION_ID
+                'system': NOTIFICATION_ID_SYSTEM,
+                'value': notification_id
             },
             **({'status': _nz(row.STATUS)} if _nz(row.STATUS) else {'status': 'final'}),
             'type': {'coding': [{'system': 'http://loinc.org', 'code': '34782-3', 'display': 'Infectious disease Note'}]},
@@ -577,7 +607,10 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
                 'code': 'appends',
                 'targetReference': {
                     'type': 'Composition',
-                    'identifier': {'system': 'https://demis.rki.de/fhir/NamingSystem/NotificationId', 'value': row.DEMIS_NOTIFICATION_ID}
+                    'identifier': {
+                        'system': NOTIFICATION_ID_SYSTEM,
+                        'value': referenced_notification_id
+                    }
                 }
             }],
             'date': now_iso,
@@ -614,8 +647,8 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
             'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/NotificationBundleSequence']
         },
         'identifier': {
-            'system': 'https://demis.rki.de/fhir/NamingSystem/NotificationBundleId',
-            'value': row.DEMIS_NOTIFICATION_ID
+            'system': NOTIFICATION_BUNDLE_ID_SYSTEM,
+            'value': notification_bundle_id
         },
         'type': 'document',
         'timestamp': now_iso,
