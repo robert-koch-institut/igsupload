@@ -10,7 +10,7 @@ def post_document_reference(document_reference, token):
         }
     
         response = requests.post(
-            f"{config.BASE_URL}/fhir/DocumentReference",
+            f"{config.BASE_URL}/v5/fhir/DocumentReference",
             headers=headers,
             json=document_reference,
             cert=(config.CERT, config.KEY)

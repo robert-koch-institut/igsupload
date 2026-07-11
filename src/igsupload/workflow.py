@@ -3,6 +3,8 @@ import time
 import threading
 import uuid
 import typer
+import json
+import requests
 
 import igsupload.get_token as token_module
 from igsupload.extract_csv import read_csv
@@ -74,9 +76,13 @@ def start(csv_path: str):
 
         try:
             result = send_notification(row, doc_ids)
-            typer.secho(f"Notification for {file_name} sent successfully.", fg=typer.colors.GREEN)
-            typer.echo("Server response:")
-            typer.echo(result)
+            if(result.status_code != 200):
+                typer.echo("Server response:")
+                typer.secho(result.status_code, fg=typer.colors.RED)
+                typer.echo(result.json())
+            else:
+                typer.secho(f"Notification for {file_name} sent successfully.", fg=typer.colors.GREEN)
+
 
             if isinstance(result, dict) and "parameter" in result:
                 typer.secho("Logging the Results...", fg=typer.colors.GREEN)

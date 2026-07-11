@@ -2,6 +2,7 @@ import uuid
 import re
 import requests
 import typer
+import json
 from datetime import datetime, timezone
 
 import igsupload.config as config
@@ -14,7 +15,7 @@ IGS_SPEC_BASE = "https://demis.rki.de/fhir/igs"
 def _fhir_base() -> str:
     if not config.BASE_URL:
         raise RuntimeError("BASE_URL is not set. Load config first (via --config or .env).")
-    return config.BASE_URL.rstrip("/") + "/fhir"
+    return config.BASE_URL.rstrip("/") + "/v5/fhir"
 
 
 def _nz(value):
@@ -629,20 +630,18 @@ def send_notification(row: CsvRow, doc_ids: [str]) -> dict:
         row=row,
         doc_ids=doc_ids
     )
-
+    
     url = _fhir_base() + "/$process-notification-sequence"
+    print(url)
     headers = {
         'Authorization': f'Bearer {token_module.current_token}',
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
 
-    response = requests.post(url, headers=headers, json=bundle, cert=(config.CERT, config.KEY))
-    if response.status_code != 200:
-        typer.secho(f'Error {response.status_code}:', fg=typer.colors.RED)
-        try:
-            print(response.json())
-        except ValueError:
-            print(response.text)
-        response.raise_for_status()
-    return response.json()
+    return requests.post(
+        url,
+        headers=headers,
+        json=bundle,
+        cert=(config.CERT, config.KEY),
+    )
