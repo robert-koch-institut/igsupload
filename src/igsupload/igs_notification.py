@@ -15,6 +15,9 @@ NOTIFICATION_BUNDLE_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/Notifica
 NOTIFIED_PERSON_ANONYMOUS_PROFILE = "https://demis.rki.de/fhir/StructureDefinition/NotifiedPersonAnonymous"
 ADDRESS_USE_EXTENSION = "https://demis.rki.de/fhir/StructureDefinition/AddressUse"
 ADDRESS_USE_SYSTEM = "https://demis.rki.de/fhir/CodeSystem/addressUse"
+ADAPTER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/AdapterSubstance"
+PRIMER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/PrimerSubstance"
+SEQUENCING_SUBSTANCES_SYSTEM = f"{IGS_SPEC_BASE}/CodeSystem/sequencingSubstances"
 
 
 def _fhir_base() -> str:
@@ -81,6 +84,31 @@ def _new_uuid_excluding(*excluded_values: str) -> str:
             return candidate
 
 
+def _sequencing_substance_entry(
+    substance_id: str,
+    profile: str,
+    category_code: str,
+    value: str,
+) -> dict:
+    # IGS 5.0 distinguishes adapter and primer through category.coding.
+    # Both Substance profiles explicitly prohibit code.coding.
+    return {
+        "fullUrl": f"{IGS_SPEC_BASE}/Substance/{substance_id}",
+        "resource": {
+            "resourceType": "Substance",
+            "id": substance_id,
+            "meta": {"profile": [profile]},
+            "category": [{
+                "coding": [{
+                    "system": SEQUENCING_SUBSTANCES_SYSTEM,
+                    "code": category_code,
+                }]
+            }],
+            "code": {"text": value},
+        },
+    }
+
+
 def _prune(obj):
     if isinstance(obj, dict):
         cleaned = {}
@@ -140,11 +168,13 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     practitioner_role_id = str(uuid.uuid4())
 
     # --- Adapter-Parsing ---
-    adapter1, adapter2 = ("", "")
+    adapters = []
     if _nz(row.ADAPTER):
-        split_adapters = row.ADAPTER.split("+", 1)
-        adapter1 = split_adapters[0].strip()
-        adapter2 = split_adapters[1].strip() if len(split_adapters) > 1 else ""
+        adapters = [
+            adapter.strip()
+            for adapter in row.ADAPTER.split("+", 1)
+            if adapter.strip()
+        ]
 
     # --- Notifier/Sequenzierlabor ---
     org_identifier_value = _nz(row.SEQUENCING_LAB_DEMIS_LAB_ID)
@@ -288,53 +318,28 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     }
 
     # --- Sequenzierung ---
-    adapter1_id = str(uuid.uuid4())
-    adapter2_id = str(uuid.uuid4())
-    primer_id = str(uuid.uuid4())
-
-    adapter1_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Substance/{adapter1_id}',
-        'resource': {
-            'resourceType': 'Substance',
-            'id': adapter1_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/AdapterSubstance']},
-            'code': {'coding': [{
-                'system': 'https://demis.rki.de/fhir/igs/CodeSystem/sequencingSubstances',
-                'code': 'adapter', 'display': 'Adapter Sequence'
-            }]},
-            **({'description': _nz(adapter1)} if _nz(adapter1) else {})
-        }
-    }
-
-    adapter2_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Substance/{adapter2_id}',
-        'resource': {
-            'resourceType': 'Substance',
-            'id': adapter2_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/AdapterSubstance']},
-            'code': {'coding': [{
-                'system': 'https://demis.rki.de/fhir/igs/CodeSystem/sequencingSubstances',
-                'code': 'adapter', 'display': 'Adapter Sequence'
-            }]},
-            **({'description': _nz(adapter2)} if _nz(adapter2) else {})
-        }
-    }
+    adapter_entries = []
+    for adapter in adapters:
+        adapter_id = str(uuid.uuid4())
+        adapter_entries.append(
+            _sequencing_substance_entry(
+                substance_id=adapter_id,
+                profile=ADAPTER_SUBSTANCE_PROFILE,
+                category_code="adapter",
+                value=adapter,
+            )
+        )
 
     primer_entry = None
-    if _nz(row.PRIMER_SCHEME):
-        primer_entry = {
-            'fullUrl': f'{IGS_SPEC_BASE}/Substance/{primer_id}',
-            'resource': {
-                'resourceType': 'Substance',
-                'id': primer_id,
-                'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/PrimerSubstance']},
-                'code': {'coding': [{
-                    'system': 'https://demis.rki.de/fhir/igs/CodeSystem/sequencingSubstances',
-                    'code': 'primer', 'display': 'Primer Sequence'
-                }]},
-                'description': _nz(row.PRIMER_SCHEME)
-            }
-        }
+    primer_scheme = _nz(row.PRIMER_SCHEME)
+    if primer_scheme:
+        primer_id = str(uuid.uuid4())
+        primer_entry = _sequencing_substance_entry(
+            substance_id=primer_id,
+            profile=PRIMER_SUBSTANCE_PROFILE,
+            category_code="primer",
+            value=primer_scheme,
+        )
 
     # --- Specimen ---
     spec_received = _fmt_date_or_datetime(row.DATE_OF_RECEIVING)
@@ -343,8 +348,8 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
 
     specimen_id = str(uuid.uuid4())
     specimen_additives = [
-        {'reference': f"Substance/{adapter1_id}"},
-        {'reference': f"Substance/{adapter2_id}"}
+        {"reference": f"Substance/{entry['resource']['id']}"}
+        for entry in adapter_entries
     ]
     if primer_entry:
         specimen_additives.append({'reference': f"Substance/{primer_id}"})
@@ -635,8 +640,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         *( [submitting_org_entry] if submitting_org_entry else [] ),
         specimen_entry,
         device_entry,
-        adapter1_entry,
-        adapter2_entry,
+        *adapter_entries,
         *( [primer_entry] if primer_entry else [] ),
         molecular_sequence_entry,
         observation_entry,
