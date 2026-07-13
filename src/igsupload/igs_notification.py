@@ -568,8 +568,8 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
             'method': {'coding': [{
                 'system': 'http://snomed.info/sct',
                 'version': SNOMED_CT_VERSION,
-                'code': '117040002',
-                'display': 'Nucleic acid sequencing (procedure)'
+                'code': '1304162005',
+                'display': 'Nucleic acid sequencing technique (qualifier value)'
             }]},
             'specimen': {'reference': f'Specimen/{specimen_id}'},
             'device': {'reference': f'Device/{device_id}'},

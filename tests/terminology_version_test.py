@@ -48,3 +48,19 @@ def test_terminology_codings_use_versions_from_demis_package():
         == SNOMED_CT_VERSION
     )
     assert observation["method"]["coding"][0]["version"] == SNOMED_CT_VERSION
+
+
+def test_observation_method_uses_demis_sequencing_method():
+    bundle = build_notification_bundle(
+        _row(),
+        ["document-1", "document-2"],
+    )
+
+    method_coding = _resource(bundle, "Observation")["method"]["coding"][0]
+
+    assert method_coding == {
+        "system": "http://snomed.info/sct",
+        "version": SNOMED_CT_VERSION,
+        "code": "1304162005",
+        "display": "Nucleic acid sequencing technique (qualifier value)",
+    }
