@@ -18,6 +18,8 @@ ADDRESS_USE_SYSTEM = "https://demis.rki.de/fhir/CodeSystem/addressUse"
 ADAPTER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/AdapterSubstance"
 PRIMER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/PrimerSubstance"
 SEQUENCING_SUBSTANCES_SYSTEM = f"{IGS_SPEC_BASE}/CodeSystem/sequencingSubstances"
+LOINC_VERSION = "2.79"
+SNOMED_CT_VERSION = "http://snomed.info/sct/11000274103/version/20241115"
 
 
 def _fhir_base() -> str:
@@ -374,6 +376,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'type': {
             'coding': [{
                 'system': 'http://snomed.info/sct',
+                'version': SNOMED_CT_VERSION,
                 **({'code': _nz(row.ISOLATION_SOURCE_CODE)} if _nz(row.ISOLATION_SOURCE_CODE) else {}),
                 **({'display': _nz(row.ISOLATION_SOURCE)} if _nz(row.ISOLATION_SOURCE) else {})
             }]
@@ -546,6 +549,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
             'category': [{'coding': [{'system': 'http://terminology.hl7.org/CodeSystem/observation-category', 'code': 'laboratory'}]}],
             'code': {'coding': [{
                 'system': 'http://loinc.org',
+                'version': LOINC_VERSION,
                 'code': '41852-5',
                 'display': 'Microorganism or agent identified in Specimen',
             }]},
@@ -553,6 +557,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
                     "coding": [
                         {
                             "system": "http://snomed.info/sct",
+                            "version": SNOMED_CT_VERSION,
                             **({'code': obs_code} if obs_code else {}),
                             **({'display': obs_display} if obs_display else {})
                         }
@@ -560,7 +565,12 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
                 },
             'subject': {'reference': f'Patient/{patient_id}'},
             'interpretation': [{'coding': [{'system': 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation', 'code': 'POS'}]}],
-            'method': {'coding': [{'system': 'http://snomed.info/sct', 'code': '117040002', 'display': 'Nucleic acid sequencing (procedure)'}]},
+            'method': {'coding': [{
+                'system': 'http://snomed.info/sct',
+                'version': SNOMED_CT_VERSION,
+                'code': '117040002',
+                'display': 'Nucleic acid sequencing (procedure)'
+            }]},
             'specimen': {'reference': f'Specimen/{specimen_id}'},
             'device': {'reference': f'Device/{device_id}'},
             'derivedFrom': [{'reference': f'MolecularSequence/{sequence_id}'}]
