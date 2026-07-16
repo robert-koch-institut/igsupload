@@ -23,7 +23,7 @@ def test_post_upload_body_success(mock_finished_upload):
         print_calls = get_print_calls(mock_print)
 
     assert any("successful" in call for call in print_calls)
-    assert result is None
+    assert result is True
     mock_finished_upload.assert_called_once()
 
 def test_post_upload_body_error_json(mock_finished_upload):
@@ -39,7 +39,7 @@ def test_post_upload_body_error_json(mock_finished_upload):
     assert any("Fehler" in call for call in print_calls)
     assert any("error: Fehlertext" in call for call in print_calls)
     assert any("code: 123" in call for call in print_calls)
-    assert result is None
+    assert result is False
 
 def test_post_upload_body_error_no_json(mock_finished_upload):
     mock_response = mock.Mock()
@@ -53,7 +53,7 @@ def test_post_upload_body_error_no_json(mock_finished_upload):
 
     assert any(f"beim Upload: {mock_response.status_code}" in call for call in print_calls)
     assert any("JSON response" in call for call in print_calls)
-    assert result is None
+    assert result is False
 
 def test_post_upload_body_ssl_error(mock_finished_upload):
     mock_finished_upload.side_effect = requests.exceptions.SSLError("SSL fail")
@@ -64,7 +64,7 @@ def test_post_upload_body_ssl_error(mock_finished_upload):
 
     assert any("SSL-Error" in call for call in print_calls)
     assert any("SSL fail" in call for call in print_calls)
-    assert result is None
+    assert result is False
 
 def test_post_upload_body_request_exception(mock_finished_upload):
     mock_finished_upload.side_effect = requests.exceptions.RequestException("Netzwerkfehler")
@@ -75,4 +75,4 @@ def test_post_upload_body_request_exception(mock_finished_upload):
 
     assert any("Network-/Connectionerror" in call for call in print_calls)
     assert any("Netzwerkfehler" in call for call in print_calls)
-    assert result is None
+    assert result is False

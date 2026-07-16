@@ -1,194 +1,278 @@
-import pytest
 import os
+from types import SimpleNamespace
 from unittest import mock
+
+import pytest
 
 from igsupload.workflow import start
 
-@pytest.fixture(autouse=True)
-def mock_open(monkeypatch):
-    # Verhindert IO-Fehler überall (z.B. open("file1.fq"))
-    monkeypatch.setattr("builtins.open", mock.mock_open(read_data=b"irrelevant"))  # b"irrelevant" für binary reads
+
+def _row(file_1="file1.fq", file_2="file2.fq"):
+    return SimpleNamespace(FILE_1_NAME=file_1, FILE_2_NAME=file_2)
+
+
+def _secho_texts(mock_secho):
+    return [str(call.args[0]) for call in mock_secho.call_args_list if call.args]
+
+
+class _Response:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
 
 @pytest.fixture
-def workflow_base(monkeypatch):
-    # Patch Thread/Token
-    monkeypatch.setattr("threading.Thread", lambda *a, **kw: mock.Mock(start=lambda: None))
-    monkeypatch.setattr("time.sleep", lambda s: None)
-    monkeypatch.setattr("igsupload.workflow.read_csv", lambda csv_path: [
-        {"FILE_1_NAME": "file1.fq", "FILE_2_NAME": "file2.fq", "SEQUENCING_LAB.DEMIS_LAB_ID": "labid"}
-    ])
-    monkeypatch.setattr("os.path.abspath", lambda p: "/abs/" + p)
-    monkeypatch.setattr("os.path.dirname", lambda p: "dir")
-    monkeypatch.setattr("os.path.join", os.path.join)
+def workflow_pipeline(monkeypatch):
+    monkeypatch.setattr(
+        "igsupload.workflow.threading.Thread",
+        lambda *args, **kwargs: mock.Mock(start=lambda: None),
+    )
+    monkeypatch.setattr("igsupload.workflow.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("igsupload.workflow.os.path.abspath", lambda path: "/abs/" + path)
+    monkeypatch.setattr("igsupload.workflow.os.path.dirname", lambda path: "dir")
+    monkeypatch.setattr("igsupload.workflow.os.path.join", os.path.join)
+    monkeypatch.setattr("igsupload.workflow.os.path.exists", lambda path: True)
+    monkeypatch.setattr("igsupload.workflow.os.path.getsize", lambda path: 100)
+    monkeypatch.setattr("igsupload.workflow.create_hash", lambda path: "hash")
+    monkeypatch.setattr(
+        "igsupload.workflow.build_document_reference",
+        lambda file_name, hash_value: {"file": file_name, "hash": hash_value},
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.get_presigned_url",
+        lambda token, doc_id, size: ("upload-id", ["url"], 100),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.put_chunks",
+        lambda path, size, urls, upload_id: {
+            "uploadId": upload_id,
+            "completedChunks": [{"partNumber": 1, "eTag": "etag-1"}],
+        },
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.post_upload_body",
+        lambda doc_id, body, token: True,
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.start_validation",
+        lambda doc_id, token: True,
+    )
 
-def get_secho_texts(mock_secho):
-    texts = []
-    for call in mock_secho.call_args_list:
-        args, kwargs = call
-        if args:
-            texts.append(str(args[0]))
-    return texts
 
-def get_echo_texts(mock_echo):
-    texts = []
-    for call in mock_echo.call_args_list:
-        args, kwargs = call
-        if args:
-            texts.append(str(args[0]))
-    return texts
+def test_notification_is_sent_once_after_both_files_are_valid(
+    monkeypatch,
+    workflow_pipeline,
+):
+    row = _row("Sample12346_R1.fastq", "Sample12346_R2.fastq")
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
 
-def test_workflow_success(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "VALID")
-    monkeypatch.setattr("igsupload.workflow.send_notification", lambda fn, docid, labid: {
-        "parameter": [
-            {"name": "submitterGeneratedNotificationID", "valueString": "notifid"},
-            {"name": "transactionID", "valueString": "transid"},
-            {"name": "labSequenceID", "valueString": "seqid"}
-        ]
-    })
-    monkeypatch.setattr("igsupload.workflow.extract_param", lambda params, key: next((p["valueString"] for p in params if p["name"] == key), None))
-    monkeypatch.setattr("igsupload.workflow.log_to_csv", lambda **kw: None)
+    post_document_reference = mock.Mock(side_effect=["doc-r1", "doc-r2"])
+    poll_validation_status = mock.Mock(side_effect=["VALID", "VALID"])
+    send_notification = mock.Mock(return_value=_Response())
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        post_document_reference,
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        poll_validation_status,
+    )
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
 
-    with mock.patch("igsupload.workflow.typer.secho"), mock.patch("igsupload.workflow.typer.echo"):
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
         start("dummy.csv")
 
-def test_workflow_file_not_found(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: False)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho:
-        start("dummy.csv")
-        texts = get_secho_texts(mock_secho)
-        assert any("File not found" in t for t in texts)
+    send_notification.assert_called_once_with(row, ["doc-r1", "doc-r2"])
+    assert any(
+        "Notification for Sample12346_R1.fastq and Sample12346_R2.fastq "
+        "sent successfully." in text
+        for text in _secho_texts(secho)
+    )
 
-def test_workflow_document_reference_failed(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: None)
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho:
-        start("dummy.csv")
-        texts = get_secho_texts(mock_secho)
-        assert any("Failed to create DocumentReference" in t for t in texts)
 
-def test_workflow_validation_failed(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "INVALID")
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho:
-        start("dummy.csv")
-        texts = get_secho_texts(mock_secho)
-        assert any("Validation failed" in t for t in texts)
+@pytest.mark.parametrize(
+    "statuses",
+    [
+        ["INVALID", "VALID"],
+        ["VALID", "INVALID"],
+        ["TIMEOUT", "VALID"],
+    ],
+)
+def test_notification_is_not_sent_if_any_file_is_not_valid(
+    monkeypatch,
+    workflow_pipeline,
+    statuses,
+):
+    row = _row()
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-r1", "doc-r2"]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(side_effect=statuses),
+    )
+    send_notification = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
 
-def test_workflow_notification_exception_with_json(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "VALID")
-    class FakeResponse:
-        status_code = 400
-        def json(self): return {"error": "fail"}
-        text = "failtext"
-    class FakeException(Exception):
-        def __init__(self): self.response = FakeResponse()
-    def fail_notify(*a, **kw): raise FakeException()
-    monkeypatch.setattr("igsupload.workflow.send_notification", fail_notify)
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho, mock.patch("igsupload.workflow.typer.echo") as mock_echo:
-        start("dummy.csv")
-        secho_texts = get_secho_texts(mock_secho)
-        echo_texts = get_echo_texts(mock_echo)
-        assert any("Error 400 sending notification" in t for t in secho_texts)
-        assert any("error" in t for t in echo_texts)
-
-def test_workflow_notification_exception_without_json(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "VALID")
-    class FakeResponse:
-        status_code = 400
-        def json(self): raise ValueError("no json")
-        text = "failtext"
-    class FakeException(Exception):
-        def __init__(self): self.response = FakeResponse()
-    def fail_notify(*a, **kw): raise FakeException()
-    monkeypatch.setattr("igsupload.workflow.send_notification", fail_notify)
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho, mock.patch("igsupload.workflow.typer.echo") as mock_echo:
-        start("dummy.csv")
-        secho_texts = get_secho_texts(mock_secho)
-        echo_texts = get_echo_texts(mock_echo)
-        assert any("Error 400 sending notification" in t for t in secho_texts)
-        assert any("failtext" in t for t in echo_texts)
-
-def test_workflow_notification_exception_other(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "VALID")
-    def fail_notify(*a, **kw): raise Exception("something unexpected")
-    monkeypatch.setattr("igsupload.workflow.send_notification", fail_notify)
-    with mock.patch("igsupload.workflow.typer.secho") as mock_secho:
-        start("dummy.csv")
-        texts = get_secho_texts(mock_secho)
-        assert any("Unexpected error" in t for t in texts)
-
-def test_workflow_notification_no_parameter(monkeypatch, workflow_base):
-    monkeypatch.setattr("os.path.exists", lambda p: True)
-    monkeypatch.setattr("os.path.getsize", lambda p: 100)
-    monkeypatch.setattr("igsupload.workflow.create_hash", lambda p: "hash")
-    monkeypatch.setattr("igsupload.workflow.build_document_reference", lambda f, h: {"doc": f, "hash": h})
-    monkeypatch.setattr("igsupload.workflow.post_document_reference", lambda doc, token: "docid")
-    monkeypatch.setattr("igsupload.workflow.get_presigned_url", lambda token, docid, size: ("up_id", ["url1"], 42))
-    monkeypatch.setattr("igsupload.workflow.put_chunks", lambda path, size, urls, uid: {"uploadId": "up_id", "completedChunks": []})
-    monkeypatch.setattr("igsupload.workflow.post_upload_body", lambda docid, body, token: None)
-    monkeypatch.setattr("igsupload.workflow.start_validation", lambda docid, token: None)
-    monkeypatch.setattr("igsupload.workflow.poll_validation_status", lambda docid, token: "VALID")
-    monkeypatch.setattr("igsupload.workflow.send_notification", lambda fn, docid, labid: {})
-    with mock.patch("igsupload.workflow.typer.secho"), mock.patch("igsupload.workflow.typer.echo"):
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
         start("dummy.csv")
 
-def test_workflow_continue_branch(monkeypatch, workflow_base):
-    monkeypatch.setattr("igsupload.workflow.read_csv", lambda csv_path: [
-        {"FILE_1_NAME": "", "FILE_2_NAME": "", "SEQUENCING_LAB.DEMIS_LAB_ID": "labid"},
-        {"SEQUENCING_LAB.DEMIS_LAB_ID": "labid"}, 
-    ])
-    monkeypatch.setattr("os.path.abspath", lambda p: "/abs/" + p)
-    monkeypatch.setattr("os.path.dirname", lambda p: "dir")
-    monkeypatch.setattr("os.path.join", os.path.join)
-    with mock.patch("igsupload.workflow.typer.secho"), mock.patch("igsupload.workflow.typer.echo"):
+    send_notification.assert_not_called()
+    assert any("Notification not sent" in text for text in _secho_texts(secho))
+
+
+def test_notification_is_not_sent_if_a_required_file_is_missing(
+    monkeypatch,
+    workflow_pipeline,
+):
+    row = _row(file_2="")
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(return_value="doc-r1"),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+    send_notification = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
+
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
         start("dummy.csv")
 
+    send_notification.assert_not_called()
+    texts = _secho_texts(secho)
+    assert any("Missing required sequence file: FILE_2_NAME" in text for text in texts)
+    assert any("Notification not sent" in text for text in texts)
+
+
+def test_notification_is_not_sent_if_document_reference_creation_fails(
+    monkeypatch,
+    workflow_pipeline,
+):
+    row = _row()
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-r1", None]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+    send_notification = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
+
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
+        start("dummy.csv")
+
+    send_notification.assert_not_called()
+    assert any(
+        "Failed to create DocumentReference for file2.fq" in text
+        for text in _secho_texts(secho)
+    )
+
+
+@pytest.mark.parametrize(
+    ("failing_step", "expected_message"),
+    [
+        ("upload_info", "Failed to get upload information"),
+        ("chunks", "Chunk upload incomplete"),
+        ("finish", "Failed to finish upload"),
+        ("validation_start", "Failed to start validation"),
+    ],
+)
+def test_notification_is_not_sent_if_an_upload_step_fails(
+    monkeypatch,
+    workflow_pipeline,
+    failing_step,
+    expected_message,
+):
+    row = _row()
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-r1", "doc-r2"]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+
+    if failing_step == "upload_info":
+        monkeypatch.setattr(
+            "igsupload.workflow.get_presigned_url",
+            mock.Mock(side_effect=[None, ("upload-id", ["url"], 100)]),
+        )
+    elif failing_step == "chunks":
+        monkeypatch.setattr(
+            "igsupload.workflow.put_chunks",
+            mock.Mock(
+                side_effect=[
+                    {"uploadId": "upload-id", "completedChunks": []},
+                    {
+                        "uploadId": "upload-id",
+                        "completedChunks": [
+                            {"partNumber": 1, "eTag": "etag-1"}
+                        ],
+                    },
+                ]
+            ),
+        )
+    elif failing_step == "finish":
+        monkeypatch.setattr(
+            "igsupload.workflow.post_upload_body",
+            mock.Mock(side_effect=[False, True]),
+        )
+    else:
+        monkeypatch.setattr(
+            "igsupload.workflow.start_validation",
+            mock.Mock(side_effect=[False, True]),
+        )
+
+    send_notification = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
+
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
+        start("dummy.csv")
+
+    send_notification.assert_not_called()
+    texts = _secho_texts(secho)
+    assert any(expected_message in text for text in texts)
+    assert any("Notification not sent" in text for text in texts)
+
+
+def test_document_reference_ids_are_isolated_per_csv_row(
+    monkeypatch,
+    workflow_pipeline,
+):
+    first_row = _row("first_R1.fq", "first_R2.fq")
+    second_row = _row("second_R1.fq", "second_R2.fq")
+    monkeypatch.setattr(
+        "igsupload.workflow.read_csv",
+        lambda path: [first_row, second_row],
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-1", "doc-2", "doc-3", "doc-4"]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+    send_notification = mock.Mock(return_value=_Response())
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
+
+    with mock.patch("igsupload.workflow.typer.secho"):
+        start("dummy.csv")
+
+    assert send_notification.call_args_list == [
+        mock.call(first_row, ["doc-1", "doc-2"]),
+        mock.call(second_row, ["doc-3", "doc-4"]),
+    ]

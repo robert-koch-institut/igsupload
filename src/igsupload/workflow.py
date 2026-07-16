@@ -31,13 +31,23 @@ def start(csv_path: str):
     time.sleep(2)
 
     rows = read_csv(csv_path)
-    doc_ids = []
     for row in rows:
+        doc_ids = []
+        file_names = []
+        all_files_valid = True
+
         for file_num in (1,2):
             file_name = getattr(row, f"FILE_{file_num}_NAME")
 
             if not file_name:
+                typer.secho(
+                    f"Missing required sequence file: FILE_{file_num}_NAME",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
                 continue
+
+            file_names.append(file_name)
 
             file_path = os.path.abspath(
                 os.path.join(os.path.dirname(csv_path), "..", "reads", file_name)
@@ -46,6 +56,7 @@ def start(csv_path: str):
 
             if not os.path.exists(file_path):
                 typer.secho(f"File not found: {file_path}", fg=typer.colors.RED)
+                all_files_valid = False
                 continue
 
             # SHA-256 Hash
@@ -54,25 +65,95 @@ def start(csv_path: str):
             # create and post DocumentReference
             doc_ref = build_document_reference(file_name, hash_value)
             doc_id = post_document_reference(doc_ref, token_module.current_token)
-            doc_ids += [doc_id]
             if not doc_id:
                 typer.secho(f"Failed to create DocumentReference for {file_name}", fg=typer.colors.RED)
+                all_files_valid = False
                 continue
 
             # upload chunks
             size = os.path.getsize(file_path)
-            upload_id, urls, part_size = get_presigned_url(
+            upload_info = get_presigned_url(
                 token_module.current_token, doc_id, size
             )
+            if not upload_info:
+                typer.secho(
+                    f"Failed to get upload information for {file_name}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
+                continue
+
+            upload_id, urls, part_size = upload_info
+            if not upload_id or not urls or not part_size:
+                typer.secho(
+                    f"Incomplete upload information for {file_name}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
+                continue
+
             complete_body = put_chunks(file_path, part_size, urls, upload_id)
-            post_upload_body(doc_id, complete_body, token_module.current_token)
+            completed_chunks = (
+                complete_body.get("completedChunks", []) if complete_body else []
+            )
+            chunks_complete = (
+                len(completed_chunks) == len(urls)
+                and all(chunk.get("eTag") for chunk in completed_chunks)
+            )
+            if not chunks_complete:
+                typer.secho(
+                    f"Chunk upload incomplete for {file_name}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
+                continue
+
+            upload_finished = post_upload_body(
+                doc_id,
+                complete_body,
+                token_module.current_token,
+            )
+            if not upload_finished:
+                typer.secho(
+                    f"Failed to finish upload for {file_name}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
+                continue
 
             # validation of files
-            start_validation(doc_id, token_module.current_token)
+            validation_started = start_validation(
+                doc_id,
+                token_module.current_token,
+            )
+            if not validation_started:
+                typer.secho(
+                    f"Failed to start validation for {file_name}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
+                continue
+
             status = poll_validation_status(doc_id, token_module.current_token)
             if status != "VALID":
-                typer.secho(f"Validation failed for {file_name}", fg=typer.colors.RED)
+                typer.secho(
+                    f"Validation failed for {file_name}: {status}",
+                    fg=typer.colors.RED,
+                )
+                all_files_valid = False
                 continue
+
+            doc_ids.append(doc_id)
+
+        if not all_files_valid or len(doc_ids) != 2:
+            typer.secho(
+                "Notification not sent: both sequence files must complete "
+                "validation with status VALID.",
+                fg=typer.colors.RED,
+            )
+            continue
+
+        notification_label = " and ".join(file_names)
 
         try:
             result = send_notification(row, doc_ids)
@@ -81,7 +162,10 @@ def start(csv_path: str):
                 typer.secho(result.status_code, fg=typer.colors.RED)
                 typer.echo(result.json())
             else:
-                typer.secho(f"Notification for {file_name} sent successfully.", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"Notification for {notification_label} sent successfully.",
+                    fg=typer.colors.GREEN,
+                )
 
 
             if isinstance(result, dict) and "parameter" in result:
@@ -91,7 +175,7 @@ def start(csv_path: str):
                 lab_sequence_id = extract_param(result["parameter"], "labSequenceID")
 
                 log_to_csv(
-                    filename=file_name,
+                    filename=notification_label,
                     notification_id=notification_id or "",
                     transaction_id=transaction_id or "",
                     lab_sequence_id=lab_sequence_id or "",
@@ -102,10 +186,10 @@ def start(csv_path: str):
         except Exception as e:
             if hasattr(e, 'response') and e.response is not None:
                 resp = e.response
-                typer.secho(f"Error {resp.status_code} sending notification for {file_name}", fg=typer.colors.RED)
+                typer.secho(f"Error {resp.status_code} sending notification for {notification_label}", fg=typer.colors.RED)
                 try:
                     typer.echo(resp.json())
                 except ValueError:
                     typer.echo(resp.text)
             else:
-                typer.secho(f"Unexpected error for {file_name}: {e}", fg=typer.colors.RED)
+                typer.secho(f"Unexpected error for {notification_label}: {e}", fg=typer.colors.RED)
