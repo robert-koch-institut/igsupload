@@ -20,6 +20,8 @@ PRIMER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/PrimerSubstance
 SEQUENCING_SUBSTANCES_SYSTEM = f"{IGS_SPEC_BASE}/CodeSystem/sequencingSubstances"
 LOINC_VERSION = "2.79"
 SNOMED_CT_VERSION = "http://snomed.info/sct/11000274103/version/20241115"
+# Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
+INCLUDE_SEQUENCING_ADDITIVES = False
 
 
 def _fhir_base() -> str:
@@ -321,27 +323,28 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
 
     # --- Sequenzierung ---
     adapter_entries = []
-    for adapter in adapters:
-        adapter_id = str(uuid.uuid4())
-        adapter_entries.append(
-            _sequencing_substance_entry(
-                substance_id=adapter_id,
-                profile=ADAPTER_SUBSTANCE_PROFILE,
-                category_code="adapter",
-                value=adapter,
-            )
-        )
-
     primer_entry = None
-    primer_scheme = _nz(row.PRIMER_SCHEME)
-    if primer_scheme:
-        primer_id = str(uuid.uuid4())
-        primer_entry = _sequencing_substance_entry(
-            substance_id=primer_id,
-            profile=PRIMER_SUBSTANCE_PROFILE,
-            category_code="primer",
-            value=primer_scheme,
-        )
+    if INCLUDE_SEQUENCING_ADDITIVES:
+        for adapter in adapters:
+            adapter_id = str(uuid.uuid4())
+            adapter_entries.append(
+                _sequencing_substance_entry(
+                    substance_id=adapter_id,
+                    profile=ADAPTER_SUBSTANCE_PROFILE,
+                    category_code="adapter",
+                    value=adapter,
+                )
+            )
+
+        primer_scheme = _nz(row.PRIMER_SCHEME)
+        if primer_scheme:
+            primer_id = str(uuid.uuid4())
+            primer_entry = _sequencing_substance_entry(
+                substance_id=primer_id,
+                profile=PRIMER_SUBSTANCE_PROFILE,
+                category_code="primer",
+                value=primer_scheme,
+            )
 
     # --- Specimen ---
     spec_received = _fmt_date_or_datetime(row.DATE_OF_RECEIVING)
@@ -349,12 +352,16 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     spec_sequenced = _fmt_date_or_datetime(row.DATE_OF_SEQUENCING)
 
     specimen_id = str(uuid.uuid4())
-    specimen_additives = [
-        {"reference": f"Substance/{entry['resource']['id']}"}
-        for entry in adapter_entries
-    ]
-    if primer_entry:
-        specimen_additives.append({'reference': f"Substance/{primer_id}"})
+    specimen_additives = []
+    if INCLUDE_SEQUENCING_ADDITIVES:
+        specimen_additives = [
+            {"reference": f"Substance/{entry['resource']['id']}"}
+            for entry in adapter_entries
+        ]
+        if primer_entry:
+            specimen_additives.append({
+                "reference": f"Substance/{primer_entry['resource']['id']}"
+            })
 
     collector_ref = (
         f'PractitionerRole/{submitting_role_id}'
@@ -397,7 +404,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
                     }]
                 }
             } if _nz(row.SEQUENCING_STRATEGY) else {}),
-            'additive': specimen_additives,
+            **({'additive': specimen_additives} if specimen_additives else {}),
             **({'timeDateTime': spec_sequenced} if spec_sequenced else {})
         }]
     }

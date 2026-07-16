@@ -1,5 +1,6 @@
 from dataclasses import fields
 
+import igsupload.igs_notification as igs_notification
 from igsupload.extract_csv import CsvRow
 from igsupload.igs_notification import (
     ADAPTER_SUBSTANCE_PROFILE,
@@ -37,7 +38,12 @@ def _substances_with_profile(bundle: dict, profile: str) -> list[dict]:
     ]
 
 
-def test_adapters_and_primer_use_current_substance_fields():
+def test_adapters_and_primer_use_current_substance_fields(monkeypatch):
+    monkeypatch.setattr(
+        igs_notification,
+        "INCLUDE_SEQUENCING_ADDITIVES",
+        True,
+    )
     bundle = build_notification_bundle(
         _row(
             ADAPTER="adapter-1+adapter-2",
@@ -88,7 +94,12 @@ def test_adapters_and_primer_use_current_substance_fields():
     assert additive_references == substance_references
 
 
-def test_single_adapter_does_not_create_empty_second_substance():
+def test_single_adapter_does_not_create_empty_second_substance(monkeypatch):
+    monkeypatch.setattr(
+        igs_notification,
+        "INCLUDE_SEQUENCING_ADDITIVES",
+        True,
+    )
     bundle = build_notification_bundle(
         _row(ADAPTER="adapter-1"),
         ["document-1", "document-2"],
@@ -104,3 +115,26 @@ def test_single_adapter_does_not_create_empty_second_substance():
     assert specimen["processing"][0]["additive"] == [
         {"reference": f"Substance/{adapters[0]['id']}"}
     ]
+
+
+def test_additives_are_disabled_for_test_qs_v5_by_default():
+    bundle = build_notification_bundle(
+        _row(
+            ADAPTER="adapter-1+adapter-2",
+            PRIMER_SCHEME="ARTICv4.1",
+            NAME_AMP_PROTOCOL="Amplicon protocol",
+            SEQUENCING_STRATEGY="amplicon",
+            DATE_OF_SEQUENCING="2026-07-13",
+        ),
+        ["document-1", "document-2"],
+    )
+
+    specimen = _resources(bundle, "Specimen")[0]
+    processing = specimen["processing"][0]
+
+    assert igs_notification.INCLUDE_SEQUENCING_ADDITIVES is False
+    assert "additive" not in processing
+    assert _resources(bundle, "Substance") == []
+    assert processing["description"] == "Amplicon protocol"
+    assert processing["procedure"]["coding"][0]["code"] == "amplicon"
+    assert processing["timeDateTime"] == "2026-07-13"
