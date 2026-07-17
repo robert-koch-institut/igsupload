@@ -38,13 +38,15 @@ def test_start_validation_success(mock_requests_post, mock_typer_style):
 def test_start_validation_error_status(mock_requests_post, mock_typer_style):
     mock_response = mock.Mock()
     mock_response.status_code = 400
+    mock_response.json.side_effect = ValueError("No JSON")
     mock_response.text = "Bad request"
     mock_requests_post.return_value = mock_response
 
     with mock.patch("builtins.print") as mock_print:
         result = start_validation("id", "token")
         mock_print.assert_any_call("Error at validation start: 400")
-        mock_print.assert_any_call("Response:", "Bad request")
+        mock_print.assert_any_call("Server response:")
+        mock_print.assert_any_call("Bad request")
     assert result is False
 
 def test_start_validation_ssl_error(mock_requests_post, mock_typer_style):

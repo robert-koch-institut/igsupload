@@ -21,7 +21,7 @@ SEQUENCING_SUBSTANCES_SYSTEM = f"{IGS_SPEC_BASE}/CodeSystem/sequencingSubstances
 LOINC_VERSION = "2.79"
 SNOMED_CT_VERSION = "http://snomed.info/sct/11000274103/version/20241115"
 # Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
-INCLUDE_SEQUENCING_ADDITIVES = False
+INCLUDE_SEQUENCING_ADDITIVES = True
 
 
 def _fhir_base() -> str:

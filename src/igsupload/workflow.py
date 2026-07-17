@@ -18,6 +18,12 @@ from igsupload.start_validation import start_validation
 from igsupload.long_polling_val import poll_validation_status
 from igsupload.igs_notification import send_notification
 from igsupload.igsupload_logger import log_to_csv, extract_param
+from igsupload.fhir_response import parse_fhir_response, report_fhir_error
+
+
+NOTIFICATION_BUNDLE_PROFILE = (
+    "https://demis.rki.de/fhir/igs/StructureDefinition/NotificationBundleSequence"
+)
 
 
 def start(csv_path: str):
@@ -157,22 +163,28 @@ def start(csv_path: str):
 
         try:
             result = send_notification(row, doc_ids)
-            if(result.status_code != 200):
-                typer.echo("Server response:")
-                typer.secho(result.status_code, fg=typer.colors.RED)
-                typer.echo(result.json())
-            else:
-                typer.secho(
-                    f"Notification for {notification_label} sent successfully.",
-                    fg=typer.colors.GREEN,
+            parsed_response = parse_fhir_response(result)
+            if result.status_code != 200:
+                report_fhir_error(
+                    parsed_response,
+                    resource="Notification Bundle",
+                    expected_profile=NOTIFICATION_BUNDLE_PROFILE,
+                    output=typer.echo,
                 )
+                continue
 
+            typer.secho(
+                f"Notification for {notification_label} sent successfully.",
+                fg=typer.colors.GREEN,
+            )
 
-            if isinstance(result, dict) and "parameter" in result:
+            response_body = parsed_response.payload
+            if isinstance(response_body, dict) and "parameter" in response_body:
                 typer.secho("Logging the Results...", fg=typer.colors.GREEN)
-                notification_id = extract_param(result["parameter"], "submitterGeneratedNotificationID")
-                transaction_id = extract_param(result["parameter"], "transactionID")
-                lab_sequence_id = extract_param(result["parameter"], "labSequenceID")
+                parameters = response_body["parameter"]
+                notification_id = extract_param(parameters, "submitterGeneratedNotificationID")
+                transaction_id = extract_param(parameters, "transactionID")
+                lab_sequence_id = extract_param(parameters, "labSequenceID")
 
                 log_to_csv(
                     filename=notification_label,

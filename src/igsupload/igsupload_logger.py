@@ -7,6 +7,13 @@ from datetime import datetime
 base_dir = os.getcwd()
 logging_path = base_dir
 
+
+def get_logging_directory() -> Path:
+    """Return the shared directory for log and analysis files."""
+    directory = Path(logging_path) / "logging"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
 def set_logging_path(path: str):
     global logging_path
 
@@ -57,11 +64,10 @@ def log_to_csv(
     csv_path: str = None
 ):
 
-    logging_dir = os.path.join(logging_path, "logging")
-    os.makedirs(logging_dir, exist_ok=True) 
+    logging_dir = get_logging_directory()
 
     if not csv_path:
-        csv_path = os.path.join(logging_dir, "igsupload_log.csv")
+        csv_path = logging_dir / "igsupload_log.csv"
 
     fieldnames = [
         'timestamp',

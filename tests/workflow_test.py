@@ -276,3 +276,110 @@ def test_document_reference_ids_are_isolated_per_csv_row(
         mock.call(first_row, ["doc-1", "doc-2"]),
         mock.call(second_row, ["doc-3", "doc-4"]),
     ]
+
+
+def test_successful_notification_parameters_are_logged(
+    monkeypatch,
+    workflow_pipeline,
+):
+    row = _row("Sample12346_R1.fastq", "Sample12346_R2.fastq")
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-r1", "doc-r2"]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+    response_payload = {
+        "resourceType": "Parameters",
+        "parameter": [
+            {
+                "name": "submitterGeneratedNotificationID",
+                "valueIdentifier": {"value": "notification-id"},
+            },
+            {
+                "name": "transactionID",
+                "valueIdentifier": {"value": "transaction-id"},
+            },
+            {
+                "name": "labSequenceID",
+                "valueIdentifier": {"value": "lab-sequence-id"},
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        "igsupload.workflow.send_notification",
+        mock.Mock(return_value=_Response(payload=response_payload)),
+    )
+    log_to_csv = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.log_to_csv", log_to_csv)
+
+    with mock.patch("igsupload.workflow.typer.secho"):
+        start("dummy.csv")
+
+    log_to_csv.assert_called_once_with(
+        filename="Sample12346_R1.fastq and Sample12346_R2.fastq",
+        notification_id="notification-id",
+        transaction_id="transaction-id",
+        lab_sequence_id="lab-sequence-id",
+        document_reference_id=["doc-r1", "doc-r2"],
+        status="OK",
+    )
+
+
+def test_failed_notification_reports_operation_outcome(
+    monkeypatch,
+    workflow_pipeline,
+    tmp_path,
+):
+    monkeypatch.setattr("igsupload.igsupload_logger.logging_path", str(tmp_path))
+    row = _row()
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
+    monkeypatch.setattr(
+        "igsupload.workflow.post_document_reference",
+        mock.Mock(side_effect=["doc-r1", "doc-r2"]),
+    )
+    monkeypatch.setattr(
+        "igsupload.workflow.poll_validation_status",
+        mock.Mock(return_value="VALID"),
+    )
+    operation_outcome = {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "invalid",
+                "details": {"text": "Profile mismatch"},
+                "diagnostics": "Unexpected patient profile",
+                "expression": ["Bundle.entry[1].resource.meta.profile"],
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        "igsupload.workflow.send_notification",
+        mock.Mock(return_value=_Response(status_code=422, payload=operation_outcome)),
+    )
+    log_to_csv = mock.Mock()
+    monkeypatch.setattr("igsupload.workflow.log_to_csv", log_to_csv)
+
+    with mock.patch("igsupload.workflow.typer.echo") as echo:
+        start("dummy.csv")
+
+    rendered = "\n".join(str(call.args[0]) for call in echo.call_args_list)
+    assert "Resource: Notification Bundle" in rendered
+    assert "Expected profile:" in rendered
+    assert "Severity: error" in rendered
+    assert "Path: Bundle.entry[1].resource.meta.profile" in rendered
+    assert "Details: Profile mismatch" in rendered
+    assert "Diagnostics: Unexpected patient profile" in rendered
+    assert "=== Complete OperationOutcome available ===" in rendered
+    saved_outcomes = list(
+        (tmp_path / "logging").glob(
+            "operation-outcome_notification-bundle_*.json"
+        )
+    )
+    assert len(saved_outcomes) == 1
+    assert saved_outcomes[0].read_text(encoding="utf-8").strip()
+    log_to_csv.assert_not_called()

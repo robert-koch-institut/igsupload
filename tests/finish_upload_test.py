@@ -37,14 +37,15 @@ def test_post_upload_body_error_json(mock_finished_upload):
         print_calls = get_print_calls(mock_print)
 
     assert any("Fehler" in call for call in print_calls)
-    assert any("error: Fehlertext" in call for call in print_calls)
-    assert any("code: 123" in call for call in print_calls)
+    assert any('"error": "Fehlertext"' in call for call in print_calls)
+    assert any('"code": 123' in call for call in print_calls)
     assert result is False
 
 def test_post_upload_body_error_no_json(mock_finished_upload):
     mock_response = mock.Mock()
     mock_response.status_code = 400
     mock_response.json.side_effect = ValueError("no json")
+    mock_response.text = "Bad request"
     mock_finished_upload.return_value = mock_response
 
     with mock.patch("builtins.print") as mock_print:
@@ -52,7 +53,8 @@ def test_post_upload_body_error_no_json(mock_finished_upload):
         print_calls = get_print_calls(mock_print)
 
     assert any(f"beim Upload: {mock_response.status_code}" in call for call in print_calls)
-    assert any("JSON response" in call for call in print_calls)
+    assert any("Server response:" in call for call in print_calls)
+    assert any("Bad request" in call for call in print_calls)
     assert result is False
 
 def test_post_upload_body_ssl_error(mock_finished_upload):

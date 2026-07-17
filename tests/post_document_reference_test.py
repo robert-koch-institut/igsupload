@@ -50,8 +50,8 @@ def test_post_document_reference_error_json_response(mock_post_document_referenc
         assert document_id is None
         # Check output
         assert any("Error during Upload: 400" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
-        assert any("Error (JSON):" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
-        assert any("error: Invalid input" in str(call) or "code: 42" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
+        assert any("Server response:" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
+        assert any('"error": "Invalid input"' in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
 
 def test_post_document_reference_error_no_json_response(mock_post_document_reference, mock_typer_style):
     # Fehlerstatus + keine gültige JSON-Antwort
@@ -70,7 +70,7 @@ def test_post_document_reference_error_no_json_response(mock_post_document_refer
         assert document_id is None
         # Output prüfen
         assert any("Error during Upload: 500" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
-        assert any("No JSON response" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
+        assert any("Server response:" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
         assert any("Internal Server Error" in str(call) for call in [args[0] for args, _ in mock_print.call_args_list])
 
 def test_post_document_reference_ssl_error(mock_post_document_reference, mock_typer_style):

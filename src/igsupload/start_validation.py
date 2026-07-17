@@ -2,6 +2,7 @@ import requests
 import typer
 
 import igsupload.config as config
+from igsupload.fhir_response import parse_fhir_response, report_fhir_error
 
 
 def start_validation(doc_id, token):
@@ -28,7 +29,10 @@ def start_validation(doc_id, token):
             f"{typer.style('Error', fg=typer.colors.RED)} "
             f"at validation start: {response.status_code}"
         )
-        print("Response:", response.text)
+        report_fhir_error(
+            parse_fhir_response(response),
+            resource="DocumentReference validation",
+        )
         return False
 
     except requests.exceptions.SSLError as ssl_err:

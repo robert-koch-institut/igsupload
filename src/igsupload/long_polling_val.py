@@ -1,23 +1,26 @@
-import typer
 import time
+
 import requests
+import typer
+
 import igsupload.config as config
+from igsupload.fhir_response import parse_fhir_response, report_fhir_error
 
-def poll_validation_status(doc_id, token, timeout = 300): # timeout so there is no endless loop
 
+def poll_validation_status(doc_id, token, timeout=300):
+    """Poll validation status until completion or timeout."""
     headers = {
         "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
-
     start_time = time.time()
 
     while True:
         try:
             response = requests.get(
-              f"{config.BASE_URL}/S3Controller/upload/{doc_id}/$validation-status",
-              headers=headers, 
-              cert=(config.CERT, config.KEY)
+                f"{config.BASE_URL}/S3Controller/upload/{doc_id}/$validation-status",
+                headers=headers,
+                cert=(config.CERT, config.KEY),
             )
 
             if response.status_code == 200:
@@ -26,30 +29,49 @@ def poll_validation_status(doc_id, token, timeout = 300): # timeout so there is 
                 done = result.get("done")
                 message = result.get("message")
 
-                color_status = typer.colors.GREEN if status == "VALID" else typer.colors.RED
-                color_bool = typer.colors.GREEN if done else typer.colors.RED
-                styled_status = typer.style(status, fg=color_status)
-                styled_bool = typer.style(done, fg=color_bool)
-                
-                if message == None:
-                  print(f"Current status: {styled_status} (done={styled_bool})")
+                status_color = (
+                    typer.colors.GREEN if status == "VALID" else typer.colors.RED
+                )
+                done_color = typer.colors.GREEN if done else typer.colors.RED
+                styled_status = typer.style(status, fg=status_color)
+                styled_done = typer.style(done, fg=done_color)
+
+                if message is None:
+                    print(f"Current status: {styled_status} (done={styled_done})")
                 else:
-                  print(f"Current status: {styled_status} (done={styled_bool}) mit message: {message}")
+                    print(
+                        f"Current status: {styled_status} (done={styled_done}) "
+                        f"mit message: {message}"
+                    )
 
                 if done:
-                    print(f"{typer.style('Validation', fg=typer.colors.GREEN)} finished.")
+                    print(
+                        f"{typer.style('Validation', fg=typer.colors.GREEN)} "
+                        "finished."
+                    )
                     return status
-
             else:
-                print(f"{typer.style('Error', fg=typer.colors.RED)}: {response.status_code}")
-                print(response.text)
+                print(
+                    f"{typer.style('Error', fg=typer.colors.RED)}: "
+                    f"{response.status_code}"
+                )
+                report_fhir_error(
+                    parse_fhir_response(response),
+                    resource="DocumentReference validation status",
+                )
 
-        except requests.RequestException as e:
-            print(f"{typer.style('Networkerror', fg=typer.colors.RED)} during polling:", e)
+        except requests.RequestException as error:
+            print(
+                f"{typer.style('Networkerror', fg=typer.colors.RED)} "
+                "during polling:",
+                error,
+            )
 
         if time.time() - start_time > timeout:
-            print(f"Validation took to long ({typer.style('Timeout', fg=typer.colors.RED)}).")
+            print(
+                "Validation took to long "
+                f"({typer.style('Timeout', fg=typer.colors.RED)})."
+            )
             return "TIMEOUT"
 
-        # waiting period
         time.sleep(5)

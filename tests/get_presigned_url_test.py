@@ -32,6 +32,7 @@ def test_get_presigned_url_success(mock_requests_get):
 
 def test_get_presigned_url_error_json(mock_requests_get):
     mock_response = mock.Mock()
+    mock_response.status_code = 400
     mock_response.json.return_value = {
         "error": "irgendwas schiefgelaufen",
         "info": "mehr infos"
@@ -48,6 +49,7 @@ def test_get_presigned_url_error_no_json(mock_requests_get):
     mock_response = mock.Mock()
     mock_response.status_code = 400
     mock_response.json.side_effect = ValueError("no json")
+    mock_response.text = "Bad request"
     mock_requests_get.return_value = mock_response
 
     with mock.patch("builtins.print") as mock_print:
@@ -55,7 +57,8 @@ def test_get_presigned_url_error_no_json(mock_requests_get):
         print_calls = get_print_calls(mock_print)
 
     assert any("Error during upload: 400" in call or "Error" in call for call in print_calls)
-    assert any("JSON response" in call for call in print_calls)
+    assert any("Server response:" in call for call in print_calls)
+    assert any("Bad request" in call for call in print_calls)
     assert result is None
 
 def test_get_presigned_url_ssl_error(mock_requests_get):

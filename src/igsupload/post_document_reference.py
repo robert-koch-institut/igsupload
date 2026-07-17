@@ -1,6 +1,7 @@
 import typer
 import igsupload.config as config
 import requests
+from igsupload.fhir_response import parse_fhir_response, report_fhir_error
 
 def post_document_reference(document_reference, token):
     try:
@@ -22,15 +23,10 @@ def post_document_reference(document_reference, token):
             return result.get("id")
 
         print(f"{typer.style('Error', fg=typer.colors.RED)} during Upload: {response.status_code}")
-
-        try:
-            error_json = response.json()
-            print(f"{typer.style('Error', fg=typer.colors.GREEN)} (JSON):")
-            for key, val in error_json.items():
-                print(f"   {key}: {val}")
-        except ValueError:
-            print(f"{typer.style('No', fg=typer.colors.GREEN)} JSON response")
-            print(response.text)
+        report_fhir_error(
+            parse_fhir_response(response),
+            resource="DocumentReference",
+        )
 
         return None
 
@@ -43,4 +39,3 @@ def post_document_reference(document_reference, token):
         msg = f"{typer.style('Network-/Connectionerror', fg=typer.colors.RED)}:"
         print(msg)
         print(e)
-

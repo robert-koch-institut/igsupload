@@ -25,6 +25,8 @@ def make_response(status_code, json_data=None, text="ERROR"):
     resp.status_code = status_code
     if json_data is not None:
         resp.json.return_value = json_data
+    else:
+        resp.json.side_effect = ValueError("No JSON")
     resp.text = text
     return resp
 

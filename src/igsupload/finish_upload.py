@@ -2,6 +2,7 @@ import requests
 import typer
 
 import igsupload.config as config
+from igsupload.fhir_response import parse_fhir_response, report_fhir_error
 
 
 def post_upload_body(doc_id, complete_upload_body, token):
@@ -29,14 +30,10 @@ def post_upload_body(doc_id, complete_upload_body, token):
         )
         print(msg)
 
-        try:
-            error_json = response.json()
-            print(f"{typer.style('Error', fg=typer.colors.RED)} (JSON):")
-            for key, val in error_json.items():
-                print(f"   {key}: {val}")
-        except ValueError:
-            print(f"{typer.style('No', fg=typer.colors.RED)} JSON response")
-            print(response.text)
+        report_fhir_error(
+            parse_fhir_response(response),
+            resource="DocumentReference upload",
+        )
 
         return False
 
