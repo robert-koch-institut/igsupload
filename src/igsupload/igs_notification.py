@@ -8,20 +8,47 @@ from datetime import datetime, timezone
 import igsupload.config as config
 import igsupload.get_token as token_module
 from igsupload.extract_csv import CsvRow
+from igsupload.fhir_constants import (
+    ADAPTER_SUBSTANCE_PROFILE,
+    ADDRESS_USE_EXTENSION,
+    ADDRESS_USE_SYSTEM,
+    CONCLUSION_CODE_SYSTEM,
+    DEMIS_LABORATORY_ID_SYSTEM,
+    DIAGNOSTIC_REPORT_PROFILE,
+    IGS_FHIR_BASE,
+    ISOLATE_EXTENSION,
+    LOINC_VERSION,
+    MOLECULAR_SEQUENCE_PROFILE,
+    NOTIFICATION_BUNDLE_ID_SYSTEM,
+    NOTIFICATION_BUNDLE_PROFILE,
+    NOTIFICATION_CATEGORY_SYSTEM,
+    NOTIFICATION_ID_SYSTEM,
+    NOTIFICATION_PROFILE,
+    NOTIFIED_PERSON_ANONYMOUS_PROFILE,
+    NOTIFIER_FACILITY_PROFILE,
+    NOTIFIER_ROLE_PROFILE,
+    OBSERVATION_PROFILE,
+    ORGANIZATION_TYPE_SYSTEM,
+    PRIMER_SUBSTANCE_PROFILE,
+    SEQUENCE_AUTHOR_EXTENSION,
+    SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
+    SEQUENCE_UPLOAD_DATE_EXTENSION,
+    SEQUENCE_UPLOAD_STATUS_EXTENSION,
+    SEQUENCE_UPLOAD_SUBMITTER_EXTENSION,
+    SEQUENCING_DEVICE_PROFILE,
+    SEQUENCING_PLATFORM_SYSTEM,
+    SEQUENCING_REASON_EXTENSION,
+    SEQUENCING_STRATEGY_SYSTEM,
+    SEQUENCING_SUBSTANCES_SYSTEM,
+    SNOMED_CT_VERSION,
+    SPECIMEN_PROFILE,
+    SUBMITTING_FACILITY_PROFILE,
+    SUBMITTING_ROLE_PROFILE,
+)
 
-IGS_SPEC_BASE = "https://demis.rki.de/fhir/igs"
-NOTIFICATION_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationId"
-NOTIFICATION_BUNDLE_ID_SYSTEM = "https://demis.rki.de/fhir/NamingSystem/NotificationBundleId"
-NOTIFIED_PERSON_ANONYMOUS_PROFILE = "https://demis.rki.de/fhir/StructureDefinition/NotifiedPersonAnonymous"
-ADDRESS_USE_EXTENSION = "https://demis.rki.de/fhir/StructureDefinition/AddressUse"
-ADDRESS_USE_SYSTEM = "https://demis.rki.de/fhir/CodeSystem/addressUse"
-ADAPTER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/AdapterSubstance"
-PRIMER_SUBSTANCE_PROFILE = f"{IGS_SPEC_BASE}/StructureDefinition/PrimerSubstance"
-SEQUENCING_SUBSTANCES_SYSTEM = f"{IGS_SPEC_BASE}/CodeSystem/sequencingSubstances"
-LOINC_VERSION = "2.79"
-SNOMED_CT_VERSION = "http://snomed.info/sct/11000274103/version/20241115"
+IGS_SPEC_BASE = IGS_FHIR_BASE
 # Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
-INCLUDE_SEQUENCING_ADDITIVES = True
+INCLUDE_SEQUENCING_ADDITIVES = False
 
 
 def _fhir_base() -> str:
@@ -192,16 +219,16 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     org_resource = {
         'resourceType': 'Organization',
         'id': organization_id,
-        'meta': {'profile': ['https://demis.rki.de/fhir/StructureDefinition/NotifierFacility']},
+        'meta': {'profile': [NOTIFIER_FACILITY_PROFILE]},
         **({
             'identifier': [{
-                'system': 'https://demis.rki.de/fhir/NamingSystem/DemisLaboratoryId',
+                'system': DEMIS_LABORATORY_ID_SYSTEM,
                 'value': org_identifier_value
             }]
         } if org_identifier_value else {}),
         "type": [{
             "coding": [{
-                "system": "https://demis.rki.de/fhir/CodeSystem/organizationType",
+                "system": ORGANIZATION_TYPE_SYSTEM,
                 "code": "refLab",
                 "display": "Einrichtung der Spezialdiagnostik"
             }]
@@ -227,7 +254,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'resource': {
             'resourceType': 'PractitionerRole',
             'id': practitioner_role_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/StructureDefinition/NotifierRole']},
+            'meta': {'profile': [NOTIFIER_ROLE_PROFILE]},
             'organization': {'reference': f'Organization/{organization_id}'}
         }
     }
@@ -251,11 +278,11 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     submitting_org_resource = {
         "resourceType": "Organization",
         "id": submitting_org_id,
-        **({"meta": {"profile": ["https://demis.rki.de/fhir/StructureDefinition/SubmittingFacility"]}}
+        **({"meta": {"profile": [SUBMITTING_FACILITY_PROFILE]}}
            if can_claim_submitting_profile else {}),
         **({
             "identifier": [{
-                "system": "https://demis.rki.de/fhir/NamingSystem/DemisLaboratoryId",
+                "system": DEMIS_LABORATORY_ID_SYSTEM,
                 "value": sub_labid
             }]
         } if sub_labid else {}),
@@ -283,7 +310,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         submitting_role_resource = {
             "resourceType": "PractitionerRole",
             "id": submitting_role_id,
-            **({"meta": {"profile": ["https://demis.rki.de/fhir/StructureDefinition/SubmittingRole"]}}
+            **({"meta": {"profile": [SUBMITTING_ROLE_PROFILE]}}
                if can_claim_submitting_profile else {}),
             "organization": {"reference": f"Organization/{submitting_org_id}"}
         }
@@ -372,11 +399,11 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     specimen_resource = {
         'resourceType': 'Specimen',
         'id': specimen_id,
-        'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/SpecimenSequence']},
+        'meta': {'profile': [SPECIMEN_PROFILE]},
         'status': 'available',
         **({
             'extension': [{
-                'url': 'https://demis.rki.de/fhir/igs/StructureDefinition/Isolate',
+                'url': ISOLATE_EXTENSION,
                 'valueString': _nz(row.ISOLATE)
             }]
         } if _nz(row.ISOLATE) else {}),
@@ -399,7 +426,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
             **({
                 'procedure': {
                     'coding': [{
-                        'system': 'https://demis.rki.de/fhir/igs/CodeSystem/sequencingStrategy',
+                        'system': SEQUENCING_STRATEGY_SYSTEM,
                         'code': _nz(row.SEQUENCING_STRATEGY)
                     }]
                 }
@@ -419,14 +446,14 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     device_resource = {
         'resourceType': 'Device',
         'id': device_id,
-        'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/SequencingDevice']},
+        'meta': {'profile': [SEQUENCING_DEVICE_PROFILE]},
         **({
             'deviceName': [{'name': _nz(row.SEQUENCING_INSTRUMENT), 'type': 'model-name'}]
         } if _nz(row.SEQUENCING_INSTRUMENT) else {}),
         **({
             'type': {
                 'coding': [{
-                    'system': 'https://demis.rki.de/fhir/igs/CodeSystem/sequencingPlatform',
+                    'system': SEQUENCING_PLATFORM_SYSTEM,
                     'code': _nz(row.SEQUENCING_PLATFORM),
                     'display': _nz(row.SEQUENCING_PLATFORM)
                 }]
@@ -462,7 +489,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         )
 
     repo_extensions = [{
-        "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceUploadStatus",
+        "url": SEQUENCE_UPLOAD_STATUS_EXTENSION,
         "valueCoding": {
             "system": "http://snomed.info/sct",
             "code": status_code
@@ -472,12 +499,12 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     upload_date = _fmt_date_or_datetime(row.UPLOAD_DATE)
     if upload_date:
         repo_extensions.append({
-            "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceUploadDate",
+            "url": SEQUENCE_UPLOAD_DATE_EXTENSION,
             "valueDateTime": upload_date
         })
     if _nz(row.UPLOAD_SUBMITTER):
         repo_extensions.append({
-            "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceUploadSubmitter",
+            "url": SEQUENCE_UPLOAD_SUBMITTER_EXTENSION,
             "valueString": _nz(row.UPLOAD_SUBMITTER)
         })
 
@@ -491,13 +518,13 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
 
     # --- Sequencing reason & SequenceAuthor ---
     seq_extensions = [{
-        "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceDocumentReference",
+        "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
         "valueReference": {
             "reference": f"{_fhir_base()}/DocumentReference/{doc_ids[0]}",
             "type": "DocumentReference"
         }
     },{
-        "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceDocumentReference",
+        "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
         "valueReference": {
             "reference": f"{_fhir_base()}/DocumentReference/{doc_ids[1]}",
             "type": "DocumentReference"
@@ -509,7 +536,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         code = SEQ_REASON_TO_SNOMED.get(key) or (_nz(row.SEQUENCING_REASON) if re.fullmatch(r"\d+", _nz(row.SEQUENCING_REASON)) else None)
         if code:
             seq_extensions.insert(0, {
-                "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequencingReason",
+                "url": SEQUENCING_REASON_EXTENSION,
                 "valueCoding": {
                     "system": "http://snomed.info/sct",
                     "code": code
@@ -519,7 +546,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     author_txt = _nz(row.AUTHOR)
     if author_txt:
         seq_extensions.insert(0, {
-            "url": "https://demis.rki.de/fhir/igs/StructureDefinition/SequenceAuthor",
+            "url": SEQUENCE_AUTHOR_EXTENSION,
             "valueString": author_txt
         })
 
@@ -527,7 +554,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     molecular_sequence_resource = {
         'resourceType': 'MolecularSequence',
         'id': sequence_id,
-        'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/Sequence']},
+        'meta': {'profile': [MOLECULAR_SEQUENCE_PROFILE]},
         'coordinateSystem': 1,
         'specimen': {'reference': f'Specimen/{specimen_id}'},
         'device': {'reference': f'Device/{device_id}'},
@@ -551,7 +578,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'resource': {
             'resourceType': 'Observation',
             'id': observation_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/PathogenDetectionSequence']},
+            'meta': {'profile': [OBSERVATION_PROFILE]},
             **({'status': _nz(row.STATUS)} if _nz(row.STATUS) else {'status': 'final'}),
             'category': [{'coding': [{'system': 'http://terminology.hl7.org/CodeSystem/observation-category', 'code': 'laboratory'}]}],
             'code': {'coding': [{
@@ -592,10 +619,10 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'resource': {
             'resourceType': 'DiagnosticReport',
             'id': diagnostic_report_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/LaboratoryReportSequence']},
+            'meta': {'profile': [DIAGNOSTIC_REPORT_PROFILE]},
             'status': 'final',
             'code': {'coding': [{
-                'system': 'https://demis.rki.de/fhir/CodeSystem/notificationCategory',
+                'system': NOTIFICATION_CATEGORY_SYSTEM,
                 **({'code': dr_code} if dr_code else {})
             }]},
             'subject': {'reference': f'Patient/{patient_id}'},
@@ -604,7 +631,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
             'conclusion': 'NACHWEIS eines meldepflichtigen Erregers',
             'conclusionCode': [{
                 'coding': [{
-                    'system': 'https://demis.rki.de/fhir/CodeSystem/conclusionCode',
+                    'system': CONCLUSION_CODE_SYSTEM,
                     'code': 'pathogenDetected',
                     'display': 'Meldepflichtiger Erreger nachgewiesen'
                 }]
@@ -618,7 +645,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'resource': {
             'resourceType': 'Composition',
             'id': notification_id,
-            'meta': {'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/NotificationSequence']},
+            'meta': {'profile': [NOTIFICATION_PROFILE]},
             'identifier': {
                 'system': NOTIFICATION_ID_SYSTEM,
                 'value': notification_id
@@ -668,7 +695,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
         'resourceType': 'Bundle',
         'meta': {
             'lastUpdated': now_iso,
-            'profile': ['https://demis.rki.de/fhir/igs/StructureDefinition/NotificationBundleSequence']
+            'profile': [NOTIFICATION_BUNDLE_PROFILE]
         },
         'identifier': {
             'system': NOTIFICATION_BUNDLE_ID_SYSTEM,

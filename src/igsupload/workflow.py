@@ -20,11 +20,7 @@ from igsupload.igs_notification import send_notification
 from igsupload.igsupload_logger import log_to_csv, extract_param
 from igsupload.fhir_response import parse_fhir_response, report_fhir_error
 from igsupload.redaction import redact_text
-
-
-NOTIFICATION_BUNDLE_PROFILE = (
-    "https://demis.rki.de/fhir/igs/StructureDefinition/NotificationBundleSequence"
-)
+from igsupload.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
 
 
 def start(csv_path: str):
