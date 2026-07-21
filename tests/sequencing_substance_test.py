@@ -117,7 +117,7 @@ def test_single_adapter_does_not_create_empty_second_substance(monkeypatch):
     ]
 
 
-def test_additives_are_enabled_by_default():
+def test_additives_are_disabled_for_test_qs_v5_by_default():
     bundle = build_notification_bundle(
         _row(
             ADAPTER="adapter-1+adapter-2",
@@ -132,10 +132,9 @@ def test_additives_are_enabled_by_default():
     specimen = _resources(bundle, "Specimen")[0]
     processing = specimen["processing"][0]
 
-    assert igs_notification.INCLUDE_SEQUENCING_ADDITIVES is True
-    assert len(processing["additive"]) == 3
-    assert len(_substances_with_profile(bundle, ADAPTER_SUBSTANCE_PROFILE)) == 2
-    assert len(_substances_with_profile(bundle, PRIMER_SUBSTANCE_PROFILE)) == 1
+    assert igs_notification.INCLUDE_SEQUENCING_ADDITIVES is False
+    assert "additive" not in processing
+    assert _resources(bundle, "Substance") == []
     assert processing["description"] == "Amplicon protocol"
     assert processing["procedure"]["coding"][0]["code"] == "amplicon"
     assert processing["timeDateTime"] == "2026-07-13"
