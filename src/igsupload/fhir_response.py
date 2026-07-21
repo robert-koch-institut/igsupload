@@ -10,6 +10,8 @@ from typing import Any, Callable, Mapping
 
 import typer
 
+from igsupload.redaction import redact_sensitive_data, redact_text
+
 
 OutputFunction = Callable[[str], None]
 
@@ -88,19 +90,19 @@ def report_fhir_error(
             fg=typer.colors.RED,
         )
     )
-    output(f"Resource: {resource}")
+    output(f"Resource: {redact_text(resource)}")
     if expected_profile:
-        output(f"Expected profile: {expected_profile}")
+        output(f"Expected profile: {redact_text(expected_profile)}")
 
     if response.is_operation_outcome:
         if response.issues:
             for number, issue in enumerate(response.issues, start=1):
                 output(f"Issue {number}:")
                 output(_format_severity(issue.severity))
-                output(f"  Code: {issue.code or 'not provided'}")
-                output(f"  Path: {', '.join(issue.paths) or 'not provided'}")
-                output(f"  Details: {issue.details or 'not provided'}")
-                output(f"  Diagnostics: {issue.diagnostics or 'not provided'}")
+                output(f"  Code: {_safe_text(issue.code)}")
+                output(f"  Path: {_safe_text(', '.join(issue.paths))}")
+                output(f"  Details: {_safe_text(issue.details)}")
+                output(f"  Diagnostics: {_safe_text(issue.diagnostics)}")
         else:
             output("OperationOutcome contains no issues.")
 
@@ -124,10 +126,16 @@ def report_fhir_error(
 
     if response.payload is not None:
         output("Server response:")
-        output(json.dumps(response.payload, ensure_ascii=False, indent=2))
+        output(
+            json.dumps(
+                redact_sensitive_data(response.payload),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     elif response.text:
         output("Server response:")
-        output(response.text)
+        output(redact_text(response.text))
     else:
         output("The server returned no response body.")
     return None
@@ -139,7 +147,7 @@ def save_operation_outcome(
     directory: Path | None = None,
     resource: str = "FHIR resource",
 ) -> Path:
-    """Save an OperationOutcome without overwriting an existing analysis file."""
+    """Save a redacted OperationOutcome without overwriting analysis files."""
     if directory is None:
         from igsupload.igsupload_logger import get_logging_directory
 
@@ -149,12 +157,17 @@ def save_operation_outcome(
         directory.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
-    resource_name = _filename_slug(resource)
+    resource_name = _filename_slug(redact_text(resource))
     filename_stem = f"operation-outcome_{resource_name}_{timestamp}"
     path, descriptor = _create_unique_file(directory, filename_stem)
 
     with os.fdopen(descriptor, "w", encoding="utf-8") as file:
-        json.dump(payload, file, ensure_ascii=False, indent=2)
+        json.dump(
+            redact_sensitive_data(payload),
+            file,
+            ensure_ascii=False,
+            indent=2,
+        )
         file.write("\n")
 
     return path.resolve()
@@ -193,9 +206,10 @@ def _report_saved_operation_outcome(
     )
     output("")
     output(heading)
-    output("The complete server response was saved for detailed analysis:")
+    output("The complete server response was sanitized and saved for analysis:")
     output(f"  {path}")
-    output("Open this JSON file to inspect the original OperationOutcome.")
+    output("Sensitive access values were redacted before writing the file.")
+    output("Open this JSON file to inspect all OperationOutcome issues.")
     output(typer.style("=" * 43, fg=typer.colors.YELLOW, bold=True))
     output("")
 
@@ -209,6 +223,10 @@ def _format_severity(severity: str | None) -> str:
     }.get(value.lower())
     text = f"  Severity: {value}"
     return typer.style(text, fg=color) if color else text
+
+
+def _safe_text(value: str | None) -> str:
+    return redact_text(value) if value else "not provided"
 
 
 def _parse_issue(issue: Mapping[str, Any]) -> OperationOutcomeIssue:

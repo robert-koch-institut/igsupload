@@ -5,6 +5,7 @@ import typer
 
 import igsupload.config as config
 from igsupload.fhir_response import parse_fhir_response, report_fhir_error
+from igsupload.redaction import redact_text
 
 
 def poll_validation_status(doc_id, token, timeout=300):
@@ -41,7 +42,7 @@ def poll_validation_status(doc_id, token, timeout=300):
                 else:
                     print(
                         f"Current status: {styled_status} (done={styled_done}) "
-                        f"mit message: {message}"
+                        f"mit message: {redact_text(str(message))}"
                     )
 
                 if done:
@@ -64,7 +65,7 @@ def poll_validation_status(doc_id, token, timeout=300):
             print(
                 f"{typer.style('Networkerror', fg=typer.colors.RED)} "
                 "during polling:",
-                error,
+                redact_text(str(error)),
             )
 
         if time.time() - start_time > timeout:

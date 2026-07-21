@@ -72,6 +72,28 @@ def test_get_token_error_response(mock_requests_post):
     assert response == (None, None)
     mock_requests_post.assert_called_once()
 
+
+def test_get_token_error_response_redacts_secrets(mock_requests_post):
+    mock_response = mock.Mock()
+    mock_response.status_code = 401
+    mock_response.json.return_value = {
+        "client_secret": "client-secret-value",
+        "message": "Authorization: Bearer bearer-value",
+    }
+    mock_requests_post.return_value = mock_response
+
+    with mock.patch("builtins.print") as output:
+        response = token_manager.get_token()
+
+    rendered = "\n".join(
+        " ".join(str(value) for value in call.args)
+        for call in output.call_args_list
+    )
+    assert response == (None, None)
+    assert "client-secret-value" not in rendered
+    assert "bearer-value" not in rendered
+    assert "[REDACTED]" in rendered
+
 def test_get_token_with_refresh_token(mock_requests_post):
     mock_response = mock.Mock()
     mock_response.status_code = 200

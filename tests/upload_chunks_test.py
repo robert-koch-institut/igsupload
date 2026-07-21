@@ -1,6 +1,7 @@
 import tempfile
 import pytest
 from unittest import mock
+import requests
 
 from src.igsupload import upload_chunks
 
@@ -73,3 +74,36 @@ def test_put_chunks_error(mock_requests_put):
     assert len(result["completedChunks"]) == 1  # Nur der erste Chunk erfolgreich
     assert any("Error" in call for call in print_calls)
     assert any("while uploading chunk 2" in call for call in print_calls)
+
+
+def test_put_chunks_redacts_presigned_url_from_network_error(mock_requests_put):
+    presigned_url = (
+        "https://uploads.example.org/sample.fastq"
+        "?X-Amz-Credential=credential-value"
+        "&X-Amz-Signature=signature-value"
+    )
+    mock_requests_put.side_effect = requests.RequestException(
+        f"Connection failed for {presigned_url} with Bearer bearer-value"
+    )
+
+    with tempfile.NamedTemporaryFile() as file:
+        file.write(b"sequence-data")
+        file.flush()
+        with mock.patch("builtins.print") as output:
+            result = upload_chunks.put_chunks(
+                file.name,
+                1024,
+                [presigned_url],
+                "uploadid",
+            )
+
+    rendered = "\n".join(
+        " ".join(str(value) for value in call.args)
+        for call in output.call_args_list
+    )
+    assert result["completedChunks"] == []
+    assert "credential-value" not in rendered
+    assert "signature-value" not in rendered
+    assert "bearer-value" not in rendered
+    assert "[PRESIGNED-QUERY-REDACTED]" in rendered
+    assert "Bearer [REDACTED]" in rendered

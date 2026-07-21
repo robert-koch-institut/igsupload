@@ -5,6 +5,8 @@ import time
 import threading
 from urllib.parse import urlparse
 
+from igsupload.redaction import redact_sensitive_data, redact_text
+
 current_token = None
 refresh_token = None
 
@@ -47,22 +49,26 @@ def get_token(refresh_token=None):
         try:
             error_json = response.json()
             print(f"{typer.style('Error', fg=typer.colors.RED)} (JSON):")
-            for key, val in error_json.items():
-                print(f"   {key}: {val}")
+            safe_error = redact_sensitive_data(error_json)
+            if isinstance(safe_error, dict):
+                for key, val in safe_error.items():
+                    print(f"   {key}: {val}")
+            else:
+                print(safe_error)
         except ValueError:
             print(f"{typer.style('No', fg=typer.colors.RED)} JSON response")
-            print(response.text)
+            print(redact_text(response.text))
 
 
     except requests.exceptions.SSLError as ssl_err:
         msg = f"{typer.style('SSL-Error', fg=typer.colors.RED)} (wrong certificate?):"
         print(msg)
-        print(ssl_err)
+        print(redact_text(str(ssl_err)))
 
     except requests.exceptions.RequestException as e:
         msg = f"{typer.style('Network-/Connectionerror', fg=typer.colors.RED)}:"
         print(msg)
-        print(e)
+        print(redact_text(str(e)))
 
     return None, None
 

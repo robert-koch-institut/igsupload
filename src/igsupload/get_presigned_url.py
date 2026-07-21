@@ -3,6 +3,7 @@ import typer
 
 import igsupload.config as config
 from igsupload.fhir_response import parse_fhir_response, report_fhir_error
+from igsupload.redaction import redact_text
 
 
 def get_presigned_url(token, doc_id, file_in_bytes):
@@ -47,13 +48,13 @@ def get_presigned_url(token, doc_id, file_in_bytes):
             "(wrong certificate?):"
         )
         print(msg)
-        print(ssl_err)
+        print(redact_text(str(ssl_err)))
 
     except requests.exceptions.RequestException as error:
         msg = (
             f"{typer.style('Network-/Connectionerror', fg=typer.colors.RED)}:"
         )
         print(msg)
-        print(error)
+        print(redact_text(str(error)))
 
     return None

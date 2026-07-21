@@ -76,6 +76,30 @@ def test_log_to_csv_with_extra_fields():
         assert rows[0]["custom_field"] == "myvalue"
         assert rows[0]["another"] == "ok"
 
+
+def test_log_to_csv_redacts_sensitive_extra_fields(tmp_path):
+    csv_path = tmp_path / "redacted.csv"
+    igsupload_logger.log_to_csv(
+        filename="test.fq",
+        notification_id="nid",
+        transaction_id="tid",
+        lab_sequence_id="lid",
+        document_reference_id="did",
+        status="FAILED",
+        extra_fields={
+            "client_secret": "client-secret-value",
+            "diagnostics": "Authorization: Bearer bearer-value",
+        },
+        csv_path=str(csv_path),
+    )
+
+    with csv_path.open(newline="", encoding="utf-8") as file:
+        row = next(csv.DictReader(file))
+
+    assert row["client_secret"] == "[REDACTED]"
+    assert "bearer-value" not in row["diagnostics"]
+    assert "Authorization: [REDACTED]" in row["diagnostics"]
+
 def test_extract_param_value_found():
     params = [
         {"name": "foo", "valueIdentifier": {"value": "bar"}},
@@ -117,4 +141,3 @@ def test_log_to_csv_default_path(tmp_path):
         rows = list(csv.DictReader(f))
     assert rows[0]["filename"] == "no_path.fq"
     assert rows[0]["status"] == "OK"
-

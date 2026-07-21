@@ -3,6 +3,7 @@ import typer
 
 import igsupload.config as config
 from igsupload.fhir_response import parse_fhir_response, report_fhir_error
+from igsupload.redaction import redact_text
 
 
 def start_validation(doc_id, token):
@@ -41,7 +42,7 @@ def start_validation(doc_id, token):
             "(wrong certificate?):"
         )
         print(msg)
-        print(ssl_err)
+        print(redact_text(str(ssl_err)))
         return False
 
     except requests.exceptions.RequestException as error:
@@ -49,5 +50,5 @@ def start_validation(doc_id, token):
             f"{typer.style('Network-/Connectionerror', fg=typer.colors.RED)}:"
         )
         print(msg)
-        print(error)
+        print(redact_text(str(error)))
         return False

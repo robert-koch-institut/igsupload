@@ -6,6 +6,7 @@ from igsupload.fhir_response import (
     report_fhir_error,
     save_operation_outcome,
 )
+from igsupload.redaction import PRESIGNED_QUERY_REDACTED, REDACTED
 
 
 def _response(status_code, payload=None, text=""):
@@ -94,7 +95,8 @@ def test_operation_outcome_report_contains_context_and_every_issue(tmp_path):
     assert "Issue 2:" in rendered
     assert "Severity: warning" in rendered
     assert "=== Complete OperationOutcome available ===" in rendered
-    assert "saved for detailed analysis" in rendered
+    assert "sanitized and saved for analysis" in rendered
+    assert "Sensitive access values were redacted" in rendered
     assert "Open this JSON file" in rendered
     assert json.dumps(payload, ensure_ascii=False, indent=2) not in rendered
     assert outcome_path is not None
@@ -128,6 +130,33 @@ def test_non_json_response_is_reported_without_parse_error():
     assert "Service unavailable" in rendered
 
 
+def test_generic_json_error_is_redacted_before_console_output():
+    presigned_url = (
+        "https://uploads.example.org/sample.fastq"
+        "?X-Amz-Signature=signature-value"
+    )
+    parsed = parse_fhir_response(
+        _response(
+            400,
+            {
+                "client_secret": "client-secret-value",
+                "message": f"Authorization: Bearer bearer-value {presigned_url}",
+            },
+        )
+    )
+    output = mock.Mock()
+
+    report_fhir_error(parsed, resource="Token request", output=output)
+
+    rendered = "\n".join(call.args[0] for call in output.call_args_list)
+    assert "client-secret-value" not in rendered
+    assert "bearer-value" not in rendered
+    assert "signature-value" not in rendered
+    assert '"client_secret": "[REDACTED]"' in rendered
+    assert "Authorization: [REDACTED]" in rendered
+    assert "[PRESIGNED-QUERY-REDACTED]" in rendered
+
+
 def test_operation_outcome_filename_uses_readable_collision_suffix(tmp_path):
     payload = {"resourceType": "OperationOutcome", "issue": []}
     fixed_timestamp = mock.Mock()
@@ -154,3 +183,59 @@ def test_operation_outcome_filename_uses_readable_collision_suffix(tmp_path):
     assert second.name == (
         "operation-outcome_notification-bundle_2026-07-17_134522_2.json"
     )
+
+
+def test_operation_outcome_console_and_file_are_redacted(tmp_path):
+    presigned_url = (
+        "https://uploads.example.org/sample.fastq"
+        "?X-Amz-Credential=credential-value"
+        "&X-Amz-Signature=signature-value"
+    )
+    private_key = (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "private-key-value\n"
+        "-----END PRIVATE KEY-----"
+    )
+    payload = {
+        "resourceType": "OperationOutcome",
+        "client_secret": "client-secret-value",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "exception",
+                "diagnostics": (
+                    f"Authorization: Bearer bearer-value; upload={presigned_url}"
+                ),
+                "details": {"text": private_key},
+            }
+        ],
+    }
+    parsed = parse_fhir_response(_response(500, payload))
+    output = mock.Mock()
+
+    outcome_path = report_fhir_error(
+        parsed,
+        resource="Notification Bundle",
+        output=output,
+        outcome_directory=tmp_path,
+    )
+
+    rendered = "\n".join(call.args[0] for call in output.call_args_list)
+    saved_payload = json.loads(outcome_path.read_text(encoding="utf-8"))
+    serialized_saved_payload = json.dumps(saved_payload)
+
+    for secret in (
+        "client-secret-value",
+        "bearer-value",
+        "credential-value",
+        "signature-value",
+        "private-key-value",
+    ):
+        assert secret not in rendered
+        assert secret not in serialized_saved_payload
+
+    assert saved_payload["client_secret"] == REDACTED
+    assert "Authorization: [REDACTED]" in saved_payload["issue"][0]["diagnostics"]
+    assert PRESIGNED_QUERY_REDACTED in saved_payload["issue"][0]["diagnostics"]
+    assert "[PRIVATE-KEY-REDACTED]" == saved_payload["issue"][0]["details"]["text"]
+    assert parsed.payload == payload

@@ -19,6 +19,7 @@ from igsupload.long_polling_val import poll_validation_status
 from igsupload.igs_notification import send_notification
 from igsupload.igsupload_logger import log_to_csv, extract_param
 from igsupload.fhir_response import parse_fhir_response, report_fhir_error
+from igsupload.redaction import redact_text
 
 
 NOTIFICATION_BUNDLE_PROFILE = (
@@ -199,9 +200,15 @@ def start(csv_path: str):
             if hasattr(e, 'response') and e.response is not None:
                 resp = e.response
                 typer.secho(f"Error {resp.status_code} sending notification for {notification_label}", fg=typer.colors.RED)
-                try:
-                    typer.echo(resp.json())
-                except ValueError:
-                    typer.echo(resp.text)
+                report_fhir_error(
+                    parse_fhir_response(resp),
+                    resource="Notification Bundle",
+                    expected_profile=NOTIFICATION_BUNDLE_PROFILE,
+                    output=typer.echo,
+                )
             else:
-                typer.secho(f"Unexpected error for {notification_label}: {e}", fg=typer.colors.RED)
+                typer.secho(
+                    f"Unexpected error for {notification_label}: "
+                    f"{redact_text(str(e))}",
+                    fg=typer.colors.RED,
+                )
