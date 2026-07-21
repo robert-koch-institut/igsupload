@@ -1,20 +1,36 @@
-import pytest
-import csv
+from igsupload.extract_csv import CsvRow, read_csv
 
-from src.igsupload import extract_csv
 
-def test_read_csv(tmp_path):
-    data = "name;age\nAlice;30\nBob;25"
-    
-    test_file_path = tmp_path / "test_data" / "metadata"
-    test_file_path.mkdir(parents=True)
+def test_read_csv_returns_cleaned_csv_rows(tmp_path):
+    csv_file = tmp_path / "metadata.csv"
+    csv_file.write_text(
+        "MELDETATBESTAND;SPECIES_CODE;SPECIES;FILE_1_NAME;FILE_2_NAME\n"
+        " cvdp ; 3092008 ; Staphylococcus aureus ; sample_R1.fastq ; "
+        "sample_R2.fastq \n",
+        encoding="utf-8",
+    )
 
-    file_path = test_file_path / "test_data.csv"
-    file_path.write_text(data, encoding="utf-8")
+    result = read_csv(str(csv_file))
 
-    result = extract_csv.read_csv(str(file_path))
+    assert len(result) == 1
+    assert isinstance(result[0], CsvRow)
+    assert result[0].MELDETATBESTAND == "cvdp"
+    assert result[0].SPECIES_CODE == "3092008"
+    assert result[0].SPECIES == "Staphylococcus aureus"
+    assert result[0].FILE_1_NAME == "sample_R1.fastq"
+    assert result[0].FILE_2_NAME == "sample_R2.fastq"
+    assert result[0].LAB_SEQUENCE_ID == ""
 
-    assert result == [
-        {'name': 'Alice', 'age': '30'},
-        {'name': 'Bob', 'age': '25'}
-    ]
+
+def test_read_csv_ignores_unknown_columns(tmp_path):
+    csv_file = tmp_path / "metadata.csv"
+    csv_file.write_text(
+        "MELDETATBESTAND;UNKNOWN_COLUMN\ncvdp;ignored\n",
+        encoding="utf-8",
+    )
+
+    result = read_csv(str(csv_file))
+
+    assert len(result) == 1
+    assert result[0].MELDETATBESTAND == "cvdp"
+    assert not hasattr(result[0], "UNKNOWN_COLUMN")
