@@ -43,11 +43,12 @@ def start(csv_path: str):
             file_name = getattr(row, f"FILE_{file_num}_NAME")
 
             if not file_name:
-                typer.secho(
-                    f"Missing required sequence file: FILE_{file_num}_NAME",
-                    fg=typer.colors.RED,
-                )
-                all_files_valid = False
+                if file_num == 1:
+                    typer.secho(
+                        "Missing required sequence file: FILE_1_NAME",
+                        fg=typer.colors.RED,
+                    )
+                    all_files_valid = False
                 continue
 
             file_names.append(file_name)
@@ -148,10 +149,10 @@ def start(csv_path: str):
 
             doc_ids.append(doc_id)
 
-        if not all_files_valid or len(doc_ids) != 2:
+        if not all_files_valid or not 1 <= len(doc_ids) <= 2:
             typer.secho(
-                "Notification not sent: both sequence files must complete "
-                "validation with status VALID.",
+                "Notification not sent: one or two sequence files must "
+                "complete validation with status VALID.",
                 fg=typer.colors.RED,
             )
             continue

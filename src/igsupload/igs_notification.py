@@ -183,7 +183,12 @@ SEQ_REASON_TO_SNOMED = {
 }
 
 
-def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
+def build_notification_bundle(row: CsvRow, doc_ids: list[str]) -> dict:
+    if not 1 <= len(doc_ids) <= 2:
+        raise ValueError(
+            "An IGS notification must reference one or two sequence documents."
+        )
+
     referenced_notification_id = _required_uuid(
         row.DEMIS_NOTIFICATION_ID,
         "DEMIS_NOTIFICATION_ID",
@@ -517,19 +522,16 @@ def build_notification_bundle(row: CsvRow, doc_ids: [str]) -> dict:
     }
 
     # --- Sequencing reason & SequenceAuthor ---
-    seq_extensions = [{
-        "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
-        "valueReference": {
-            "reference": f"{_fhir_base()}/DocumentReference/{doc_ids[0]}",
-            "type": "DocumentReference"
+    seq_extensions = [
+        {
+            "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
+            "valueReference": {
+                "reference": f"{_fhir_base()}/DocumentReference/{doc_id}",
+                "type": "DocumentReference",
+            },
         }
-    },{
-        "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
-        "valueReference": {
-            "reference": f"{_fhir_base()}/DocumentReference/{doc_ids[1]}",
-            "type": "DocumentReference"
-        }
-    }]
+        for doc_id in doc_ids
+    ]
 
     if _nz(row.SEQUENCING_REASON):
         key = _nz(row.SEQUENCING_REASON).lower()

@@ -16,6 +16,7 @@ igs-upload-config/
 
 # data
 test_data/
+scripts/
 
 # logging
 logging/

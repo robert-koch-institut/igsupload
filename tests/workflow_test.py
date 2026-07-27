@@ -126,7 +126,7 @@ def test_notification_is_not_sent_if_any_file_is_not_valid(
     assert any("Notification not sent" in text for text in _secho_texts(secho))
 
 
-def test_notification_is_not_sent_if_a_required_file_is_missing(
+def test_notification_is_sent_if_optional_second_file_is_missing(
     monkeypatch,
     workflow_pipeline,
 ):
@@ -140,6 +140,25 @@ def test_notification_is_not_sent_if_a_required_file_is_missing(
         "igsupload.workflow.poll_validation_status",
         mock.Mock(return_value="VALID"),
     )
+    send_notification = mock.Mock(return_value=_Response())
+    monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
+
+    with mock.patch("igsupload.workflow.typer.secho") as secho:
+        start("dummy.csv")
+
+    send_notification.assert_called_once_with(row, ["doc-r1"])
+    assert any(
+        "Notification for file1.fq sent successfully." in text
+        for text in _secho_texts(secho)
+    )
+
+
+def test_notification_is_not_sent_if_required_first_file_is_missing(
+    monkeypatch,
+    workflow_pipeline,
+):
+    row = _row(file_1="", file_2="")
+    monkeypatch.setattr("igsupload.workflow.read_csv", lambda path: [row])
     send_notification = mock.Mock()
     monkeypatch.setattr("igsupload.workflow.send_notification", send_notification)
 
@@ -148,7 +167,7 @@ def test_notification_is_not_sent_if_a_required_file_is_missing(
 
     send_notification.assert_not_called()
     texts = _secho_texts(secho)
-    assert any("Missing required sequence file: FILE_2_NAME" in text for text in texts)
+    assert any("Missing required sequence file: FILE_1_NAME" in text for text in texts)
     assert any("Notification not sent" in text for text in texts)
 
 
