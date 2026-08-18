@@ -1,6 +1,6 @@
 # IGSUpload - CLI zum Upload von Daten für die Integrierte Genomische Surveillance
 
-CLI for the upload of sequencing data (FASTQ, FASTQ.GZIP) using the DEMIS API of the Robert Koch Institute (RKI).
+CLI for the upload of sequencing data (FASTQ, FASTA, FASTQ.GZIP) using the DEMIS API of the Robert Koch Institute (RKI).
 
 ## Table of Contents
 
@@ -54,7 +54,7 @@ This project automates the submission of sequencing data and associated metadata
 ### Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/robert-koch-institut/igsupload.git
 cd igs-upload
 ```
 
@@ -71,8 +71,8 @@ source venv/bin/activate
 You can also use **conda** if installed:
 
 ```bash
-conda create --name myenv python=3.13
-conda activate myenv
+conda create --name igsupload python=3.13
+conda activate igsupload
 ```
 
 ### Install dependencies
@@ -96,6 +96,7 @@ pip install .
 ```bash
 pip install -e .[dev]
 ```
+This option is used, if you want to install and execute pytest. 
 
 ---
 
@@ -116,7 +117,7 @@ USERNAME="your-username"
 BASE_URL="https://API-Base-URL"
 ```
 
-You will probably get a .p12 certificate from DEMIS. For this appiclication you will need a key.pem and cert.pem file. With these two bash commands you are able to convert the .p12 certificate in the key.pem and cert.pem files.
+You will probably receive a .p12 certificate from DEMIS. For this appiclication you will need a key.pem and cert.pem file. With these two bash commands you are able to convert the .p12 certificate in the key.pem and cert.pem files.
 
 ```bash
 # <path-to-p12> = Pfad zur .p12-Datei
@@ -146,7 +147,7 @@ In the end, important IDs will be logged in a csv-File. Therefore a folder calle
 igs upload --csv /path/to/metadata.csv --config /path/to/.env --log /path/to/new/log.csv
 ```
 
-Show small introduction in console:
+Show a small introduction with:
 
 ```bash
 igsupload intro
@@ -161,19 +162,7 @@ igs-upload/
 │   └── igsupload/
 │       ├── __init__.py
 │       ├── config.py                     # Configuration and certificates
-│       ├── document_reference.py         # Generate DocumentReferences
-│       ├── extract_csv.py                # Read CSV files
-│       ├── finish_upload.py              # Finalize upload
-│       ├── get_presigned_url.py          # Obtain presigned URLs
-│       ├── get_token.py                  # Token management
-│       ├── igs_notification.py           # Create and send IGS notifications
-│       ├── long_polling_val.py           # Check validation status
-│       ├── molecular_sequence.py         # Create MolecularSequence objects
-│       ├── post_document_reference.py    # Upload DocumentReferences
-│       ├── sha256_hash.py                # Calculate SHA-256 hash
-│       ├── start_validation.py           # Start validation process
-│       ├── upload_chunks.py              # Chunked file upload
-│       ├── validate.py                   # Helper validation functions
+│       ...
 │       ├── workflow.py                   # Main project workflow
 │       └── main.py                       # Entry point (CLI)
 ├── data/
@@ -184,8 +173,9 @@ igs-upload/
 │       └── Sample12346_R2.fastq
 ├── tests/                                # unit tests
 ├── .env
+├── .gitignore                           
 ├── setup.py                              # for pip
-├── requirements.txt
+├── LICENSE
 └── README.md
 ```
 
