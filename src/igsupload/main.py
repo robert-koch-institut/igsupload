@@ -15,7 +15,8 @@ def help_cmd():
     """
     typer.echo("\nIGS Uploader - Help & Troubleshooting\n")
     typer.echo("Usage:")
-    typer.echo("  igsupload --csv /path/to/metadata.csv [--config /path/to/.env]\n")
+    typer.echo("  igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]")
+    typer.echo("Normally the application searches for the .env-file inside the root folder.\nOnly set a different logging path, if you don't want the logs to be in the ./logging folder inside the project directory.\n")
     typer.echo("Typical problems and solutions:")
     typer.echo("1) ProxyError or 403 Forbidden")
     typer.echo("   → Your environment blocks requests to the DEMIS test environment.")
