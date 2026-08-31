@@ -2,6 +2,10 @@
 
 CLI for the upload of sequencing data (FASTQ, FASTQ.GZIP) using the DEMIS API of the Robert Koch Institute (RKI).
 
+## DISCLAIMER
+This tool is only meant as a reference for your own implementation.
+The company does not provide support or maintenance for it.
+
 ## Table of Contents
 
 - [IGSUpload - CLI zum Upload von Daten für die Integrierte Genomische Surveillance](#igsupload---cli-zum-upload-von-daten-für-die-integrierte-genomische-surveillance)
