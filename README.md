@@ -4,7 +4,7 @@ CLI for the upload of sequencing data (FASTQ, FASTQ.GZIP) using the DEMIS API of
 
 ## DISCLAIMER
 This tool is only meant as a reference for your own implementation.
-The company does not provide support or maintenance for it.
+The RKI does not provide support or maintenance for it.
 
 ## Table of Contents
 
