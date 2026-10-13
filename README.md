@@ -10,10 +10,10 @@ CLI for the upload of sequencing data (FASTQ, FASTA, FASTQ.GZIP) using the DEMIS
   - [Requirements](#requirements)
     - [DEMIS Environments](#demis-environments)
   - [Installation](#installation)
-    - [Clone the repository](#clone-the-repository)
-    - [Set up the virtual environment](#set-up-the-virtual-environment)
-    - [Install dependencies](#install-dependencies)
-    - [Optional (Developers only)](#optional-developers-only)
+    - [Prerequisites](#prerequisites)
+    - [igsupload Setup](#igsupload-setup)
+    - [Run igsupload](#run-igsupload)
+    - [Development (optional)](#development-optional)
     - [Configure credentials (.env)](#configure-credentials-env)
   - [Usage](#usage)
   - [Project Structure](#project-structure)
@@ -51,54 +51,72 @@ This project automates the submission of sequencing data and associated metadata
 
 ## Installation
 
-### Clone the repository
+### Prerequisites
+
+- Python 3.13 or newer
+- [uv](https://docs.astral.sh/uv/) installed on your system
+- Git
+
+### igsupload Setup
 
 ```bash
 git clone https://github.com/robert-koch-institut/igsupload.git
-cd igs-upload
+cd igsupload
+uv sync
 ```
 
-### Set up the virtual environment
+This automatically creates a virtual environment and installs all dependencies.
 
-There are different ways of creating a virtual environment.
-Setup with **venv**:
+
+### Run igsupload
 
 ```bash
-python -m venv venv
-source venv/bin/activate
+uv run igsupload --help
 ```
 
-You can also use **conda** if installed:
+Alternatively, activate the virtual environment to use the `igsupload` command directly:
 
 ```bash
-conda create --name igsupload python=3.13
-conda activate igsupload
+source .venv/bin/activate
+igsupload --help
 ```
 
-### Install dependencies
-
-User can install all dependencies via PyPi:
+To deactivate the virtual environment:
 
 ```bash
-pip install igsupload
-```
-
-If you cloned the Repository you can also install everything with:
-
-```bash
-pip install .
+deactivate
 ```
 
 ---
 
-### Optional (Developers only)
+### Development (optional)
+
+Development dependencies, including pytest and Ruff, are already installed by the default `uv sync` command.
+
+Run the test suite:
 
 ```bash
-pip install -e .[dev]
+uv run pytest
+```
+
+Run tests with coverage:
+
+```bash
+uv run pytest --cov=igsupload
+```
+
+Check code quality:
+
+```bash
+uv run ruff check .
 ```
 This option is used, if you want to install and execute pytest. 
 
----
+Format the code:
+
+```bash
+uv run ruff format .
+```
 
 ### Configure credentials (.env)
 

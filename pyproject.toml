@@ -1,0 +1,35 @@
+
+[project]
+name = "igsupload"
+version = "1.1.0"
+description = "Automated upload of sequencing data (FASTQ/FASTA/GZIP) to the DEMIS portal (RKI) for the IGS."
+readme = "README.md"
+requires-python = ">=3.13"
+
+dependencies = [
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+igsupload = "igsupload.main:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.16.0",
+    "ruff>=0.17.0",
+]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
