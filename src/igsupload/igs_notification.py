@@ -14,6 +14,7 @@ from igsupload.fhir_constants import (
     ADDRESS_USE_SYSTEM,
     CONCLUSION_CODE_SYSTEM,
     DEMIS_LABORATORY_ID_SYSTEM,
+    DEMIS_PARTICIPANT_ID_SYSTEM,
     DIAGNOSTIC_REPORT_PROFILE,
     IGS_FHIR_BASE,
     ISOLATE_EXTENSION,
@@ -48,7 +49,7 @@ from igsupload.fhir_constants import (
 
 IGS_SPEC_BASE = IGS_FHIR_BASE
 # Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
-INCLUDE_SEQUENCING_ADDITIVES = False
+INCLUDE_SEQUENCING_ADDITIVES = True
 
 
 def _fhir_base() -> str:
@@ -227,7 +228,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: list[str]) -> dict:
         'meta': {'profile': [NOTIFIER_FACILITY_PROFILE]},
         **({
             'identifier': [{
-                'system': DEMIS_LABORATORY_ID_SYSTEM,
+                'system': DEMIS_PARTICIPANT_ID_SYSTEM,
                 'value': org_identifier_value
             }]
         } if org_identifier_value else {}),

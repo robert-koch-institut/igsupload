@@ -43,6 +43,7 @@ SUBMITTING_ROLE_PROFILE = demis_profile("SubmittingRole")
 NOTIFICATION_ID_SYSTEM = demis_naming_system("NotificationId")
 NOTIFICATION_BUNDLE_ID_SYSTEM = demis_naming_system("NotificationBundleId")
 DEMIS_LABORATORY_ID_SYSTEM = demis_naming_system("DemisLaboratoryId")
+DEMIS_PARTICIPANT_ID_SYSTEM = demis_naming_system("DemisParticipantId")
 
 # Extensions
 ADDRESS_USE_EXTENSION = demis_profile("AddressUse")
