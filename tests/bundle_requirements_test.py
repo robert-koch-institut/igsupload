@@ -2,9 +2,9 @@ from dataclasses import fields
 
 import pytest
 
-import igsupload.igs_notification as igs_notification
-from igsupload.extract_csv import CsvRow
-from igsupload.fhir_constants import (
+import igsupload.fhir_builder.igs_notification as igs_notification
+from igsupload.utils.extract_csv import CsvRow
+from igsupload.fhir_builder.fhir_constants import (
     ADAPTER_SUBSTANCE_PROFILE,
     DIAGNOSTIC_REPORT_PROFILE,
     LOINC_VERSION,

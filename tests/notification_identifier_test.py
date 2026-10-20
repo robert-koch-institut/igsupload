@@ -3,8 +3,8 @@ from unittest import mock
 
 import pytest
 
-from igsupload.extract_csv import CsvRow
-from igsupload.igs_notification import (
+from igsupload.utils.extract_csv import CsvRow
+from igsupload.fhir_builder.igs_notification import (
     NOTIFICATION_BUNDLE_ID_SYSTEM,
     NOTIFICATION_ID_SYSTEM,
     build_notification_bundle,

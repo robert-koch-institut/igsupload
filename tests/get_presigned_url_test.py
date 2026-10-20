@@ -2,7 +2,7 @@ import pytest
 from unittest import mock
 import requests
 
-from src.igsupload import get_presigned_url
+from igsupload.api import get_presigned_url
 
 @pytest.fixture
 def mock_requests_get():

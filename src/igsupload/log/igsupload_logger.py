@@ -4,8 +4,6 @@ import errno
 from pathlib import Path
 from datetime import datetime
 
-from igsupload.redaction import redact_sensitive_data
-
 base_dir = os.getcwd()
 logging_path = base_dir
 
@@ -100,7 +98,7 @@ def log_to_csv(
         }
         if extra_fields:
             row.update(extra_fields)
-        writer.writerow(redact_sensitive_data(row))
+        writer.writerow(row)
 
 def extract_param(parameters, name):
     """

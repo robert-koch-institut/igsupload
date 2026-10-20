@@ -6,32 +6,21 @@ import typer
 import json
 import requests
 
-import igsupload.get_token as token_module
-from igsupload.extract_csv import read_csv
-from igsupload.document_reference import build_document_reference
-from igsupload.sha256_hash import create_hash
-from igsupload.post_document_reference import post_document_reference
-from igsupload.get_presigned_url import get_presigned_url
-from igsupload.upload_chunks import put_chunks
-from igsupload.finish_upload import post_upload_body
-from igsupload.start_validation import start_validation
-from igsupload.long_polling_val import poll_validation_status
-from igsupload.igs_notification import send_notification
-from igsupload.igsupload_logger import log_to_csv, extract_param
-from igsupload.fhir_response import parse_fhir_response, report_fhir_error
-from igsupload.redaction import redact_text
-from igsupload.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
+from igsupload.api.client import ApiClient
+from igsupload.utils.extract_csv import read_csv
+from igsupload.builders.document_reference import build_document_reference
+from igsupload.utils.sha256_hash import create_hash
+from igsupload.builders.igs_notification import send_notification
+from igsupload.log.igsupload_logger import log_to_csv, extract_param
+from igsupload.builders.fhir_response import parse_fhir_response, report_fhir_error
+from igsupload.builders.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
 
 
-def start(csv_path: str):
+def start(csv_path: str, fhir_base_url:str, api: ApiClient):
     """
     Haupt-Workflow: CSV einlesen, jede Datei verarbeiten, validieren
     und anschließend eine Sequenzmeldung senden und loggen.
     """
-    # Token im Hintergrund regelmäßig aktualisieren
-    token_thread = threading.Thread(target=token_module.update_token, daemon=True)
-    token_thread.start()
-    time.sleep(2)
 
     rows = read_csv(csv_path)
     for row in rows:
@@ -63,22 +52,19 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            # SHA-256 Hash
-            hash_value = create_hash(file_path)
+            hash_value = create_hash(file_path) # SHA-256 Hash
 
-            # create and post DocumentReference
+            # ------- create and post doc ref
             doc_ref = build_document_reference(file_name, hash_value)
-            doc_id = post_document_reference(doc_ref, token_module.current_token)
+            doc_id = api.post_doc_ref(doc_ref)
             if not doc_id:
                 typer.secho(f"Failed to create DocumentReference for {file_name}", fg=typer.colors.RED)
                 all_files_valid = False
                 continue
 
-            # upload chunks
+            # ------- presigned urls from S3
             size = os.path.getsize(file_path)
-            upload_info = get_presigned_url(
-                token_module.current_token, doc_id, size
-            )
+            upload_info = api.get_presigned_url(doc_id, size)
             if not upload_info:
                 typer.secho(
                     f"Failed to get upload information for {file_name}",
@@ -87,7 +73,11 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            upload_id, urls, part_size = upload_info
+            # ToDo: wie ist der normale Umgang mit solchen variablen? oben oder hier definieren oder sogar die Datei unterteilen usw.
+            upload_id: str = upload_info["uploadId"]
+            urls: list[str] = upload_info["presignedUrls"]
+            part_size: int = upload_info["partSizeBytes"]
+
             if not upload_id or not urls or not part_size:
                 typer.secho(
                     f"Incomplete upload information for {file_name}",
@@ -96,7 +86,8 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            complete_body = put_chunks(file_path, part_size, urls, upload_id)
+            # ------- file chunks upload
+            complete_body = api.put_file_chunks(file_path, part_size, urls, upload_id)
             completed_chunks = (
                 complete_body.get("completedChunks", []) if complete_body else []
             )
@@ -112,12 +103,9 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            upload_finished = post_upload_body(
-                doc_id,
-                complete_body,
-                token_module.current_token,
-            )
-            if not upload_finished:
+            # ------- final upload to S3
+            upload_finished = api.post_finish_upload(doc_id, complete_body)
+            if upload_finished.status_code != 204:
                 typer.secho(
                     f"Failed to finish upload for {file_name}",
                     fg=typer.colors.RED,
@@ -125,11 +113,8 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            # validation of files
-            validation_started = start_validation(
-                doc_id,
-                token_module.current_token,
-            )
+            # ------- start validation of files
+            validation_started = api.post_start_validation(doc_id)
             if not validation_started:
                 typer.secho(
                     f"Failed to start validation for {file_name}",
@@ -138,10 +123,11 @@ def start(csv_path: str):
                 all_files_valid = False
                 continue
 
-            status = poll_validation_status(doc_id, token_module.current_token)
-            if status != "VALID":
+            val_status = wait_for_validation(api, doc_id)
+
+            if val_status["status"] != "VALID":
                 typer.secho(
-                    f"Validation failed for {file_name}: {status}",
+                    f"Validation failed for {file_name}: {val_status}",
                     fg=typer.colors.RED,
                 )
                 all_files_valid = False
@@ -159,12 +145,13 @@ def start(csv_path: str):
 
         notification_label = " and ".join(file_names)
 
+         # ------- post final notification
         try:
-            result = send_notification(row, doc_ids)
-            parsed_response = parse_fhir_response(result)
+            result = send_notification(api, fhir_base_url, row, doc_ids)
+
             if result.status_code != 200:
                 report_fhir_error(
-                    parsed_response,
+                    result.json(),
                     resource="Notification Bundle",
                     expected_profile=NOTIFICATION_BUNDLE_PROFILE,
                     output=typer.echo,
@@ -176,7 +163,7 @@ def start(csv_path: str):
                 fg=typer.colors.GREEN,
             )
 
-            response_body = parsed_response.payload
+            response_body = result.json()
             if isinstance(response_body, dict) and "parameter" in response_body:
                 typer.secho("Logging the Results...", fg=typer.colors.GREEN)
                 parameters = response_body["parameter"]
@@ -206,6 +193,22 @@ def start(csv_path: str):
             else:
                 typer.secho(
                     f"Unexpected error for {notification_label}: "
-                    f"{redact_text(str(e))}",
+                    f"{(str(e))}",
                     fg=typer.colors.RED,
                 )
+
+
+
+def wait_for_validation(api: ApiClient, doc_id: str, max_wait_seconds: int = 300) -> dict:
+
+    deadline = time.monotonic() + max_wait_seconds
+
+    while time.monotonic() < deadline:
+        result = api.get_validation_status(doc_id)
+
+        if result["done"] is True:
+            return result
+
+    raise TimeoutError(
+        f"Validation timed out for document {doc_id}"
+    )

@@ -4,7 +4,7 @@ from datetime import datetime
 import requests
 import time
 
-from src.igsupload import document_reference as dc_manager
+from igsupload.fhir_builder import document_reference as dc_manager
 
 def test_get_demis_content_type():
     fastq_response = dc_manager.get_demis_content_type("test.fastq")

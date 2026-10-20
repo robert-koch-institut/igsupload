@@ -5,10 +5,11 @@ import typer
 import json
 from datetime import datetime, timezone
 
-import igsupload.config as config
-import igsupload.get_token as token_module
-from igsupload.extract_csv import CsvRow
-from igsupload.fhir_constants import (
+from igsupload.config import Settings
+import igsupload.auth.token_provider as token_module
+from igsupload.api.client import ApiClient
+from igsupload.utils.extract_csv import CsvRow
+from igsupload.builders.fhir_constants import (
     ADAPTER_SUBSTANCE_PROFILE,
     ADDRESS_USE_EXTENSION,
     ADDRESS_USE_SYSTEM,
@@ -50,12 +51,6 @@ from igsupload.fhir_constants import (
 IGS_SPEC_BASE = IGS_FHIR_BASE
 # Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
 INCLUDE_SEQUENCING_ADDITIVES = True
-
-
-def _fhir_base() -> str:
-    if not config.BASE_URL:
-        raise RuntimeError("BASE_URL is not set. Load config first (via --config or .env).")
-    return config.BASE_URL.rstrip("/") + "/v5/fhir"
 
 
 def _nz(value):
@@ -184,7 +179,7 @@ SEQ_REASON_TO_SNOMED = {
 }
 
 
-def build_notification_bundle(row: CsvRow, doc_ids: list[str]) -> dict:
+def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]) -> dict:
     if not 1 <= len(doc_ids) <= 2:
         raise ValueError(
             "An IGS notification must reference one or two sequence documents."
@@ -527,7 +522,7 @@ def build_notification_bundle(row: CsvRow, doc_ids: list[str]) -> dict:
         {
             "url": SEQUENCE_DOCUMENT_REFERENCE_EXTENSION,
             "valueReference": {
-                "reference": f"{_fhir_base()}/DocumentReference/{doc_id}",
+                "reference": f"{base_url_path}/v5/fhir/DocumentReference/{doc_id}",
                 "type": "DocumentReference",
             },
         }
@@ -712,23 +707,13 @@ def build_notification_bundle(row: CsvRow, doc_ids: list[str]) -> dict:
     return _prune(bundle)
 
 
-def send_notification(row: CsvRow, doc_ids: [str]) -> dict:
+def send_notification(api: ApiClient, fhir_base_url: str, row: CsvRow, doc_ids: list[str]) -> dict:
     bundle = build_notification_bundle(
+        base_url_path=fhir_base_url,
         row=row,
         doc_ids=doc_ids
     )
-    
-    url = _fhir_base() + "/$process-notification-sequence"
-    print(url)
-    headers = {
-        'Authorization': f'Bearer {token_module.current_token}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
 
-    return requests.post(
-        url,
-        headers=headers,
-        json=bundle,
-        cert=(config.CERT, config.KEY),
+    return api.post_igs_bundle(
+        bundle=bundle,
     )

@@ -2,7 +2,7 @@ import pytest
 from unittest import mock
 import requests
 
-from src.igsupload import finish_upload
+from igsupload.api import finish_upload
 
 @pytest.fixture
 def mock_finished_upload():

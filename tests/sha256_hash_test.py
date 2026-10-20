@@ -2,7 +2,7 @@ import tempfile
 import pytest
 import os
 
-from src.igsupload import sha256_hash
+from igsupload.utils import sha256_hash
 
 def test_create_hash_file():
     # Schreibe eine kleine Testdatei

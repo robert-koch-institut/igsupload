@@ -17,6 +17,7 @@ igs-upload-config/
 # data
 test_data/
 scripts/
+tmp/
 
 # logging
 logging/
@@ -26,3 +27,4 @@ build/
 
 # macOS
 .DS_Store
+test.py

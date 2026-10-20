@@ -2,8 +2,8 @@ import pytest
 from unittest import mock
 import requests
 
-from src.igsupload import post_document_reference as post_dc
-from src.igsupload import document_reference as dc
+from igsupload.api import post_document_reference as post_dc
+from igsupload.fhir_builder import document_reference as dc
 
 @pytest.fixture
 def mock_post_document_reference():

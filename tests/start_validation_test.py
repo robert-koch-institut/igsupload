@@ -2,7 +2,7 @@ import pytest
 from unittest import mock
 import requests
 
-from src.igsupload.start_validation import start_validation
+from igsupload.api.start_validation import start_validation
 
 @pytest.fixture
 def mock_requests_post():

@@ -1,8 +1,8 @@
 from dataclasses import fields
 
-import igsupload.igs_notification as igs_notification
-from igsupload.extract_csv import CsvRow
-from igsupload.igs_notification import (
+import igsupload.fhir_builder.igs_notification as igs_notification
+from igsupload.utils.extract_csv import CsvRow
+from igsupload.fhir_builder.igs_notification import (
     ADAPTER_SUBSTANCE_PROFILE,
     PRIMER_SUBSTANCE_PROFILE,
     SEQUENCING_SUBSTANCES_SYSTEM,

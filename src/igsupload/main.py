@@ -2,9 +2,12 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from igsupload.config import Settings
+from igsupload.auth.token_provider import TokenProvider
+from igsupload.api.client import ApiClient
 from igsupload.workflow import start
 from igsupload.config import load_env
-from igsupload.igsupload_logger import set_logging_path
+from igsupload.log.igsupload_logger import set_logging_path
 
 app = typer.Typer(add_completion=False)
 
@@ -40,10 +43,10 @@ def main(
     csv: Optional[Path] = typer.Option(
         None, "--csv", help="Path to metadata CSV file", exists=False, show_default=False
     ),
-    config: Optional[Path] = typer.Option(
+    config_path: Optional[Path] = typer.Option(
         None, "--config", help="Optional path to a .env file (overrides auto-detection)", exists=False, show_default=False
     ),
-    log: Optional[Path] = typer.Option(
+    log_path: Optional[Path] = typer.Option(
         None, "--log", help="Optional path to a log file. If not set it will be put into the root project dircetory", exists=False, show_default=False
     ),
 ):
@@ -60,13 +63,12 @@ def main(
 
     # Config laden
     try:
-        cfg = load_env(config_path=config)
-    except Exception as e:
-        typer.echo(typer.style(f"Config error: {e}", fg=typer.colors.RED))
-        raise typer.Exit(code=1)
+        cfg: Settings = load_env(path=config_path)
+    except (FileNotFoundError, ValueError) as e:
+        typer.secho(f"Configuration error: {e}", fg=typer.colors.RED, err=True)
     
     # set log file path
-    set_logging_path(path=str(log))
+    set_logging_path(path=str(log_path))
 
     # CSV prüfen
     csv_path = csv.expanduser().resolve()
@@ -75,7 +77,20 @@ def main(
         raise typer.Exit(code=2)
 
     typer.echo(f"[INFO] load CSV-file: {csv_path}")
-    start(str(csv_path))
+
+    
+    token_provider = TokenProvider(cfg)
+    api = ApiClient(
+        base_url=cfg.base_url,
+        token_provider=token_provider,
+        cert_path=cfg.cert,
+        key_path=cfg.key,
+    )
+
+    try:
+        start(str(csv_path), cfg.base_url, api)
+    finally:
+        api.close()
 
 
 if __name__ == "__main__":

@@ -2,8 +2,8 @@ from dataclasses import fields
 from unittest import mock
 
 import igsupload.config as config
-import igsupload.igs_notification as igs_notification
-from igsupload.extract_csv import CsvRow
+import igsupload.fhir_builder.igs_notification as igs_notification
+from igsupload.utils.extract_csv import CsvRow
 
 
 def _row(**overrides) -> CsvRow:

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 import requests
 
-from src.igsupload.long_polling_val import poll_validation_status
+from igsupload.api.long_polling_val import poll_validation_status
 
 @pytest.fixture
 def mock_get_requests():

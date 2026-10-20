@@ -1,79 +1,66 @@
-from pathlib import Path
-from typing import Optional
 import os
-from dotenv import load_dotenv, find_dotenv
+from dataclasses import dataclass, field
+from pathlib import Path
 
-EXPECTED_KEYS = [
+from dotenv import load_dotenv
+
+
+REQUIRED_KEYS = [
     "CERT_URL",
     "KEY_URL",
     "CLIENT_ID",
     "CLIENT_SECRET",
     "USERNAME",
     "BASE_URL",
+    "TOKEN_URL",
 ]
 
-CERT = None
-KEY = None
 
-CLIENT_ID = None
-CLIENT_SECRET = None
-USERNAME = None
+@dataclass(frozen=True)
+class Settings:
+    cert: str
+    key: str
+    client_id: str
+    client_secret: str = field(repr=False)
+    username: str
+    base_url: str
+    token_url: str
 
-BASE_URL = None
 
-def load_env(config_path: Optional[Path] = None) -> dict:
-    """
-    Lädt .env:
-    - Wenn --config gesetzt: genau diese Datei laden.
-    - Sonst: automatische Suche im Projekt.
-    - Fehlende Keys -> Info-Print.
-    - Wenn gar kein erwarteter Key gesetzt -> Fehler.
-    Setzt zusätzlich Modul-Attribute (CERT, KEY, CLIENT_ID, CLIENT_SECRET, USERNAME, BASE_URL).
-    """
-    origin = None
+def load_env(path: Path | None = None) -> Settings:
+    """Load and validate the application configuration."""
 
-    if config_path is not None:
-        cp = Path(config_path).expanduser().resolve()
-        if not cp.exists():
-            raise FileNotFoundError(f".env file not found at: {cp}")
-        load_dotenv(dotenv_path=str(cp), override=False)
-        origin = str(cp)
-    else:
-        auto = find_dotenv(usecwd=True)
-        if not auto:
+    # Load custom .env or search automatically
+    if path is not None:
+        path = path.expanduser().resolve()
+
+        if not path.is_file():
             raise FileNotFoundError(
-                "No .env found. Provide one via --config or place a .env in the project."
+                f"Configuration file not found: {path}"
             )
-        load_dotenv(dotenv_path=auto, override=False)
-        origin = auto
 
-    # Werte lesen
-    values = {key: os.getenv(key) for key in EXPECTED_KEYS}
+        load_dotenv(path)
+    else:
+        load_dotenv()
 
-    # Mindestens ein Key muss gesetzt sein
-    non_empty = sum(1 for v in values.values() if v not in (None, ""))
-    if non_empty == 0:
-        raise RuntimeError(
-            f"No expected keys found in loaded environment ({origin}). "
-            f"Expected at least one of: {', '.join(EXPECTED_KEYS)}"
+    
+    # Check if all required environment variables exist
+    missing_keys = [
+        key for key in REQUIRED_KEYS
+        if not os.getenv(key)
+    ]
+    if missing_keys:
+        raise ValueError(
+            f"Missing configuration values: {', '.join(missing_keys)}"
         )
 
-    # Infos für fehlende Keys
-    for k, v in values.items():
-        if v in (None, ""):
-            print(f"[info] {k} not set (will be None)")
 
-    print(f"[INFO] Loaded configuration from: {origin}")
-
-    # --- Mapping auf Attribut-Namen ---
-    g = globals()
-    g["CERT"] = values.get("CERT_URL")
-    g["KEY"] = values.get("KEY_URL")
-
-    g["CLIENT_ID"] = values.get("CLIENT_ID")
-    g["CLIENT_SECRET"] = values.get("CLIENT_SECRET")
-    g["USERNAME"] = values.get("USERNAME")
-
-    g["BASE_URL"] = values.get("BASE_URL")
-
-    return values
+    return Settings(
+        cert=os.environ["CERT_URL"],
+        key=os.environ["KEY_URL"],
+        client_id=os.environ["CLIENT_ID"],
+        client_secret=os.environ["CLIENT_SECRET"],
+        username=os.environ["USERNAME"],
+        base_url=os.environ["BASE_URL"],
+        token_url=os.environ["TOKEN_URL"],
+    )

@@ -1,4 +1,4 @@
-from igsupload.extract_csv import CsvRow, read_csv
+from igsupload.utils.extract_csv import CsvRow, read_csv
 
 
 def test_read_csv_returns_cleaned_csv_rows(tmp_path):

@@ -1,7 +1,7 @@
 from dataclasses import fields
 
-from igsupload.extract_csv import CsvRow
-from igsupload.igs_notification import (
+from igsupload.utils.extract_csv import CsvRow
+from igsupload.fhir_builder.igs_notification import (
     LOINC_VERSION,
     SNOMED_CT_VERSION,
     build_notification_bundle,

@@ -10,8 +10,6 @@ from typing import Any, Callable, Mapping
 
 import typer
 
-from igsupload.redaction import redact_sensitive_data, redact_text
-
 
 OutputFunction = Callable[[str], None]
 
@@ -90,9 +88,9 @@ def report_fhir_error(
             fg=typer.colors.RED,
         )
     )
-    output(f"Resource: {redact_text(resource)}")
+    output(f"Resource: {resource}")
     if expected_profile:
-        output(f"Expected profile: {redact_text(expected_profile)}")
+        output(f"Expected profile: {expected_profile}")
 
     if response.is_operation_outcome:
         if response.issues:
@@ -128,14 +126,14 @@ def report_fhir_error(
         output("Server response:")
         output(
             json.dumps(
-                redact_sensitive_data(response.payload),
+                response.payload,
                 ensure_ascii=False,
                 indent=2,
             )
         )
     elif response.text:
         output("Server response:")
-        output(redact_text(response.text))
+        output(response.text)
     else:
         output("The server returned no response body.")
     return None
@@ -147,9 +145,9 @@ def save_operation_outcome(
     directory: Path | None = None,
     resource: str = "FHIR resource",
 ) -> Path:
-    """Save a redacted OperationOutcome without overwriting analysis files."""
+    """Save OperationOutcome without overwriting analysis files."""
     if directory is None:
-        from igsupload.igsupload_logger import get_logging_directory
+        from igsupload.log.igsupload_logger import get_logging_directory
 
         directory = get_logging_directory()
     else:
@@ -157,13 +155,13 @@ def save_operation_outcome(
         directory.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
-    resource_name = _filename_slug(redact_text(resource))
+    resource_name = _filename_slug(resource)
     filename_stem = f"operation-outcome_{resource_name}_{timestamp}"
     path, descriptor = _create_unique_file(directory, filename_stem)
 
     with os.fdopen(descriptor, "w", encoding="utf-8") as file:
         json.dump(
-            redact_sensitive_data(payload),
+            payload,
             file,
             ensure_ascii=False,
             indent=2,
@@ -206,9 +204,8 @@ def _report_saved_operation_outcome(
     )
     output("")
     output(heading)
-    output("The complete server response was sanitized and saved for analysis:")
+    output("The complete server response was saved for analysis:")
     output(f"  {path}")
-    output("Sensitive access values were redacted before writing the file.")
     output("Open this JSON file to inspect all OperationOutcome issues.")
     output(typer.style("=" * 43, fg=typer.colors.YELLOW, bold=True))
     output("")
@@ -226,7 +223,7 @@ def _format_severity(severity: str | None) -> str:
 
 
 def _safe_text(value: str | None) -> str:
-    return redact_text(value) if value else "not provided"
+    return value if value else "not provided"
 
 
 def _parse_issue(issue: Mapping[str, Any]) -> OperationOutcomeIssue:
