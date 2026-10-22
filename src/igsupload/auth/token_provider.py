@@ -43,9 +43,6 @@ class TokenProvider:
             timeout=15,
         )
 
-        print("Token HTTP status:", response.status_code)
-        print("Retry-After:", response.headers.get("Retry-After"))
-
         response.raise_for_status()
         result = response.json()
 

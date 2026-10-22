@@ -1,15 +1,20 @@
+import requests
+import logging
+import typer
+
 from pathlib import Path
 from typing import Optional
 
-import typer
 from igsupload.config import Settings
 from igsupload.auth.token_provider import TokenProvider
 from igsupload.api.client import ApiClient
+from igsupload.log.upload_report import UploadReport
 from igsupload.workflow import start
 from igsupload.config import load_env
-from igsupload.log.igsupload_logger import set_logging_path
+from igsupload.log.setup_igsupload_logger import setup_logging
 
 app = typer.Typer(add_completion=False)
+logger = logging.getLogger(__name__)
 
 @app.command("intro")
 def help_cmd():
@@ -47,7 +52,7 @@ def main(
         None, "--config", help="Optional path to a .env file (overrides auto-detection)", exists=False, show_default=False
     ),
     log_path: Optional[Path] = typer.Option(
-        None, "--log", help="Optional path to a log file. If not set it will be put into the root project dircetory", exists=False, show_default=False
+        None, "--log", help="Optional path to a log file. If not set it will be put into the logging/ dircetory", exists=False, show_default=False
     ),
 ):
     """
@@ -56,27 +61,32 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
+    log_dir = setup_logging(log_path)
+    logger.info("igsupload workflow started")
+
     if csv is None:
-        typer.echo(typer.style("Error: --csv is required.", fg=typer.colors.RED))
-        typer.echo("Use: igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]")
+        logger.error("--csv is required.")
+        logger.info("Use: igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]")
         raise typer.Exit(code=2)
 
-    # Config laden
+    # load config
     try:
+        logger.info("Loading configuration file")
+        logger.debug(f"Config file from Path: {config_path}")
         cfg: Settings = load_env(path=config_path)
     except (FileNotFoundError, ValueError) as e:
-        typer.secho(f"Configuration error: {e}", fg=typer.colors.RED, err=True)
-    
-    # set log file path
-    set_logging_path(path=str(log_path))
-
-    # CSV prüfen
-    csv_path = csv.expanduser().resolve()
-    if not csv_path.exists() or not csv_path.is_file():
-        typer.echo(typer.style(f"Error: CSV path '{csv_path}' not found.", fg=typer.colors.RED))
+        logger.error(f"Configuration error: {e}")
         raise typer.Exit(code=2)
 
-    typer.echo(f"[INFO] load CSV-file: {csv_path}")
+    
+    # check for CSV file
+    logger.info("Loading CSV file")
+    csv_path = csv.expanduser().resolve()
+    logger.debug(f"Loading CSV file from Path {csv_path}")
+    if not csv_path.exists() or not csv_path.is_file():
+        logger.error(f"CSV file not found: {csv_path}")
+        raise typer.Exit(code=2)
+    logger.info("CSV file found", extra={"color": "green"})
 
     
     token_provider = TokenProvider(cfg)
@@ -87,8 +97,41 @@ def main(
         key_path=cfg.key,
     )
 
+
     try:
-        start(str(csv_path), cfg.base_url, api)
+        report = UploadReport(report_path=log_dir)
+
+        start(csv_path, cfg.base_url, api, report)
+
+    except requests.HTTPError as exc:
+        response = exc.response
+
+        if response is not None:
+            logger.error(
+                "HTTP request failed (status %s)",
+                response.status_code,
+            )
+            logger.error(
+                "Server response: %s",
+                response.text,
+            )
+        else:
+            logger.error("HTTP request failed")
+
+        raise typer.Exit(code=1) from exc
+
+    except requests.RequestException as exc:
+        logger.error(
+            "Communication failed: %s",
+            type(exc).__name__,
+        )
+        raise typer.Exit(code=1) from exc
+
+
+    except OSError as exc:
+        logger.error(f"File operation failed: {exc}")
+        raise typer.Exit(code=1) from exc
+
     finally:
         api.close()
 

@@ -1,14 +1,14 @@
 import requests
+import logging
+
 from typing import Any
+from pathlib import Path
 
-import igsupload.config as config
-from igsupload.builders.fhir_response import parse_fhir_response, report_fhir_error
 from igsupload.utils.split_file import split_file_in_chunks
-
-# auth
 from igsupload.auth.token_provider import TokenProvider
 from igsupload.auth.bearer_auth import BearerAuth
 
+logger = logging.getLogger(__name__)
 
 class ApiClient:
     # client to communicate with demis api
@@ -56,7 +56,6 @@ class ApiClient:
 
 
     def get_presigned_url(self, doc_id:str, file_in_bytes:int) -> dict[str, str]:
-        print(f"Doc_ID: {doc_id}")
         params = {"fileSize": file_in_bytes}
         response = self._request(
             method='GET',
@@ -78,17 +77,20 @@ class ApiClient:
             "uploadId": upload_id,
             "completedChunks": [],
         }
+
+        file_size = Path(file_path).stat().st_size
+        total_chunks_num = (file_size + chunk_size - 1) // chunk_size
+
         chunks = split_file_in_chunks(file_path, chunk_size)
+        
         for part_number, chunk in enumerate(chunks, start=1):
             url = presigned_urls[part_number - 1]
             response = requests.put(url, data=chunk)
 
             if response.status_code != 200:
-                print(
-                    f"Error while uploading "
-                    f"chunk {part_number}: {response.status_code}"
-                )
-                break
+                logger.error("Error while uploading file chunks")
+                logger.debug(f"chunk {part_number}: {response.status_code}")
+                response.raise_for_status()
             
             etag = response.headers.get("ETag", "").strip('"')
             result["completedChunks"].append(
@@ -97,6 +99,7 @@ class ApiClient:
                     "eTag": etag,
                 }
             )
+            logger.info(f"Uploaded chunk {part_number} of {total_chunks_num}")
 
         return result
 

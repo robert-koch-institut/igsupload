@@ -1,13 +1,13 @@
 import os
 import csv
 import tempfile
-from igsupload.log import igsupload_logger
+from igsupload.log import setup_igsupload_logger
 
 def test_log_to_csv_creates_and_writes_file():
     # Verwendet ein temporäres Verzeichnis, so wird kein echter Logger-Ordner angelegt
     with tempfile.TemporaryDirectory() as tmpdir:
         csv_path = os.path.join(tmpdir, "test_log.csv")
-        igsupload_logger.log_to_csv(
+        setup_igsupload_logger.log_to_csv(
             filename="test.fq",
             notification_id="n1",
             transaction_id="t1",
@@ -32,7 +32,7 @@ def test_log_to_csv_appends_multiple_rows():
     with tempfile.TemporaryDirectory() as tmpdir:
         csv_path = os.path.join(tmpdir, "test_log.csv")
         # Erster Eintrag
-        igsupload_logger.log_to_csv(
+        setup_igsupload_logger.log_to_csv(
             filename="one.fq",
             notification_id="id1",
             transaction_id="tr1",
@@ -42,7 +42,7 @@ def test_log_to_csv_appends_multiple_rows():
             csv_path=csv_path
         )
         # Zweiter Eintrag
-        igsupload_logger.log_to_csv(
+        setup_igsupload_logger.log_to_csv(
             filename="two.fq",
             notification_id="id2",
             transaction_id="tr2",
@@ -61,7 +61,7 @@ def test_log_to_csv_appends_multiple_rows():
 def test_log_to_csv_with_extra_fields():
     with tempfile.TemporaryDirectory() as tmpdir:
         csv_path = os.path.join(tmpdir, "test_log.csv")
-        igsupload_logger.log_to_csv(
+        setup_igsupload_logger.log_to_csv(
             filename="extra.fq",
             notification_id="nid",
             transaction_id="tid",
@@ -81,28 +81,28 @@ def test_extract_param_value_found():
         {"name": "foo", "valueIdentifier": {"value": "bar"}},
         {"name": "id", "valueIdentifier": {"value": "abc123"}}
     ]
-    result = igsupload_logger.extract_param(params, "id")
+    result = setup_igsupload_logger.extract_param(params, "id")
     assert result == "abc123"
 
 def test_extract_param_not_found():
     params = [{"name": "notid", "valueIdentifier": {"value": "nope"}}]
-    assert igsupload_logger.extract_param(params, "doesnotexist") is None
+    assert setup_igsupload_logger.extract_param(params, "doesnotexist") is None
 
 def test_extract_param_value_identifier_missing():
     params = [{"name": "id"}]
-    assert igsupload_logger.extract_param(params, "id") is None
+    assert setup_igsupload_logger.extract_param(params, "id") is None
     params = [{"name": "id", "valueIdentifier": {}}]
-    assert igsupload_logger.extract_param(params, "id") is None
+    assert setup_igsupload_logger.extract_param(params, "id") is None
 
 def test_extract_param_value_identifier_wrong_type():
     params = [{"name": "id", "valueIdentifier": {"something": "not_value"}}]
-    assert igsupload_logger.extract_param(params, "id") is None
+    assert setup_igsupload_logger.extract_param(params, "id") is None
 
 def test_log_to_csv_default_path(tmp_path):
     # Modul-Global auf tmp_path setzen, weil es beim Import gecached wurde
-    igsupload_logger.logging_path = str(tmp_path)
+    setup_igsupload_logger.logging_path = str(tmp_path)
 
-    igsupload_logger.log_to_csv(
+    setup_igsupload_logger.log_to_csv(
         filename="no_path.fq",
         notification_id="nid",
         transaction_id="tid",

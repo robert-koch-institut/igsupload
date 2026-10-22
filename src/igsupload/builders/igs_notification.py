@@ -713,7 +713,7 @@ def send_notification(api: ApiClient, fhir_base_url: str, row: CsvRow, doc_ids: 
         row=row,
         doc_ids=doc_ids
     )
-
+    
     return api.post_igs_bundle(
         bundle=bundle,
     )
