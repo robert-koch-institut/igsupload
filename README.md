@@ -16,6 +16,7 @@ CLI for the upload of sequencing data (FASTQ, FASTA, FASTQ.GZIP) using the DEMIS
     - [Development (optional)](#development-optional)
     - [Configure credentials (.env)](#configure-credentials-env)
   - [Usage](#usage)
+    - [Final upload report](#final-upload-report)
   - [Project Structure](#project-structure)
   - [Common Issues and Solutions](#common-issues-and-solutions)
     - [Issue: ProxyError or 403 Forbidden](#issue-proxyerror-or-403-forbidden)
@@ -162,7 +163,7 @@ igsupload --csv /path/to/metadata.csv --config /path/to/.env
 In the end, important IDs will be logged in a csv-File. Therefore a folder called "logging" is created in the root project directory. If you want to set a individual path to save the logs, use the "--log" flag to specify it.
 
 ```bash
-igs upload --csv /path/to/metadata.csv --config /path/to/.env --log /path/to/new/log.csv
+igsupload --csv /path/to/metadata.csv --config /path/to/.env --log /path/to/logs
 ```
 
 Show a small introduction with:
@@ -170,6 +171,29 @@ Show a small introduction with:
 ```bash
 igsupload intro
 ```
+
+### Final upload report
+
+Every run creates an `igsupload_report.csv` file in its logging directory. The
+report contains exactly one row for every data row in the metadata CSV. The
+`metadata_row` counter starts at `1` and does not include the CSV header.
+
+The report is updated after every important processing step. This means that
+the latest state is still available if the application is interrupted.
+
+The following status values are used:
+
+- `PENDING`: The metadata row has not been processed yet.
+- `IN_PROGRESS`: The metadata row is currently being processed.
+- `SUCCESS`: Upload, validation, and notification completed successfully.
+- `FAILED`: Processing failed. See `stage`, `error_type`, and `message`.
+- `NEEDS_REVIEW`: DEMIS accepted the notification, but the expected response data
+  is missing or not complete. Do not resend automatically before checking the report.
+
+The fields `filenames`, `sha256_values`, `document_reference_ids`, `upload_ids`,
+and `validation_statuses` contain JSON arrays. Their entries use the same file
+order. Each array contains one or two values, depending on the number of
+sequence files in the metadata row.
 
 ## Project Structure
 

@@ -39,7 +39,7 @@ def load_env(path: Path | None = None) -> Settings:
                 f"Configuration file not found: {path}"
             )
 
-        load_dotenv(path)
+        load_dotenv(path, override=True)
     else:
         load_dotenv()
 

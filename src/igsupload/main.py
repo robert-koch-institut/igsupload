@@ -42,6 +42,9 @@ def help_cmd():
     typer.echo("  igsupload --csv ./data.csv --config ./secrets/.env")
     typer.echo("  igsupload intro\n")
 
+
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -99,9 +102,19 @@ def main(
 
 
     try:
-        report = UploadReport(report_path=log_dir)
+        report = UploadReport(
+            report_path=log_dir,
+            source_csv=csv_path,
+        )
 
-        start(csv_path, cfg.base_url, api, report)
+        run_successful = start(csv_path, cfg.base_url, api, report)
+        logger.info("Final upload report: %s", report.file_path)
+
+        if not run_successful:
+            logger.error(
+                "The upload finished with failed or incomplete rows."
+            )
+            raise typer.Exit(code=1)
 
     except requests.HTTPError as exc:
         response = exc.response

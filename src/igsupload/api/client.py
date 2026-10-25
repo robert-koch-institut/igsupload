@@ -85,7 +85,11 @@ class ApiClient:
         
         for part_number, chunk in enumerate(chunks, start=1):
             url = presigned_urls[part_number - 1]
-            response = requests.put(url, data=chunk)
+            response = requests.put(
+                url, 
+                data=chunk,
+                timeout=60,
+            )
 
             if response.status_code != 200:
                 logger.error("Error while uploading file chunks")

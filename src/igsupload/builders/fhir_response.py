@@ -147,9 +147,8 @@ def save_operation_outcome(
 ) -> Path:
     """Save OperationOutcome without overwriting analysis files."""
     if directory is None:
-        from igsupload.log.setup_igsupload_logger import get_logging_directory
-
-        directory = get_logging_directory()
+        directory = Path("logging")
+        directory.mkdir(parents=True, exist_ok=True)
     else:
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)

@@ -18,172 +18,359 @@ from igsupload.builders.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
 
 logger = logging.getLogger(__name__)
 
-def start(csv_path: Path, fhir_base_url:str, api: ApiClient, report: UploadReport):
+def start(
+    csv_path: Path,
+    fhir_base_url: str,
+    api: ApiClient,
+    report: UploadReport,
+) -> bool:
     """
     Haupt-Workflow: CSV einlesen, jede Datei verarbeiten, validieren,
     anschließend eine Sequenzmeldung senden und loggen.
     """
 
     rows = read_csv(csv_path)
-    for row in rows:
-        doc_ids = []
-        file_names = []
-        all_files_valid = True
+    report_rows = []
 
-        for file_num in (1,2):
-            file_name = getattr(row, f"FILE_{file_num}_NAME", None)
+    for row_number, row in enumerate(rows, start=1):
+        filenames = []
+        if row.FILE_1_NAME:
+            filenames.append(row.FILE_1_NAME)
+        if row.FILE_2_NAME:
+            filenames.append(row.FILE_2_NAME)
 
-            if not file_name:
-                if file_num == 1:
-                    logger.error("Missing required sequence file")
-                    all_files_valid = False
-                continue
+        report_rows.append((row_number, filenames))
 
-            file_names.append(file_name)
+    report.initialize_rows(report_rows)
 
-            file_path = os.path.abspath(
-                os.path.join(os.path.dirname(csv_path), "..", "reads", file_name)
-            )
-            logger.info(f"Processing file: {file_name}")
+    if not rows:
+        logger.error("The metadata CSV contains no data rows")
+        return False
 
-            if not os.path.exists(file_path):
-                logger.error(f"File not found: {file_path}")
-                all_files_valid = False
-                continue
-            logger.debug(f"file found in Path: {file_path}")
+    run_successful = True
 
-            hash_value = create_hash(file_path) # SHA-256 Hash
+    for row_number, row in enumerate(rows, start=1):
+        requested_filenames = []
+        if row.FILE_1_NAME:
+            requested_filenames.append(row.FILE_1_NAME)
+        if row.FILE_2_NAME:
+            requested_filenames.append(row.FILE_2_NAME)
 
-            # ------- create and post doc ref
-            doc_ref = build_document_reference(file_name, hash_value)
-            if not doc_ref:
-                logger.error(f"Failed to create DocumentReference for {file_name}")
-                all_files_valid = False
-                continue
-            logger.info(f"DocumentReference created for {file_name}")
-            
-            doc_id = api.post_doc_ref(doc_ref)
-            if not doc_id:
-                logger.error(f"Failed to post DocumentReference for {file_name}")
-                all_files_valid = False
-                continue
-            logger.info("DocumentReference was sent successfully", extra={"color": "green"})
-            logger.debug(f"DocumentReferenceID: {doc_id}")
+        sha256_values = []
+        document_reference_ids = []
+        upload_ids = []
+        validation_statuses = []
+        current_stage = "METADATA"
 
-            # ------- presigned urls from S3
-            size = os.path.getsize(file_path)
-            logger.info(f"Fetching upload information for {file_name}")
-            upload_info = api.get_presigned_url(doc_id, size)
-            if not upload_info:
-                logger.error(f"Failed to get upload information for {file_name}")
-                all_files_valid = False
-                continue
+        report.start_row(row_number)
 
-            upload_id: str = upload_info["uploadId"]
-            urls: list[str] = upload_info["presignedUrls"]
-            part_size: int = upload_info["partSizeBytes"]
-
-            if not upload_id or not urls or not part_size:
-                logger.error(f"Incomplete upload information for {file_name}")
-                all_files_valid = False
-                continue
-
-            # ------- file chunks upload
-            logger.info(f"Starting to upload {file_name} in chunks to fetched Presigned URLs")
-            complete_body = api.put_file_chunks(file_path, part_size, urls, upload_id)
-            completed_chunks = (
-                complete_body.get("completedChunks", []) if complete_body else []
-            )
-            chunks_complete = (
-                len(completed_chunks) == len(urls)
-                and all(chunk.get("eTag") for chunk in completed_chunks)
-            )
-            if not chunks_complete:
-                logger.error(f"Chunk upload incomplete for {file_name}")
-                all_files_valid = False
-                continue
-
-            # ------- final upload to S3
-            upload_finished = api.post_finish_upload(doc_id, complete_body)
-            if upload_finished.status_code != 204:
-                logger.error(f"Failed to finish upload for {file_name}")
-                all_files_valid = False
-                continue
-            logger.info("Finished upload to S3", extra={"color": "green"})
-            logger.debug(f"for DocumentReference ID: {doc_id}")
-
-            # ------- start validation of files
-            logger.info("Started Validation of Sequencing Files...")
-            validation_started = api.post_start_validation(doc_id)
-            if not validation_started:
-                logger.error(f"Failed to start validation for {file_name}")
-                all_files_valid = False
-                continue
-
-            val_status = wait_for_validation(api, doc_id)
-
-            if val_status["status"] != "VALID":
-                logger.error(f"Validation failed for {file_name}: {val_status}")
-                all_files_valid = False
-                continue
-            logger.info("Validation was successfull", extra={"color": "green"})
-
-            doc_ids.append(doc_id)
-
-        if not all_files_valid or not 1 <= len(doc_ids) <= 2:
-            logger.error("Notification not sent: one or two sequence files must complete validation with status VALID.")
-            continue
-
-        notification_label = " and ".join(file_names)
-
-         # ------- post final notification
         try:
-            logger.info("Building final IGS-Bundle...")
-            result = send_notification(api, fhir_base_url, row, doc_ids)
+            if not row.FILE_1_NAME:
+                raise ValueError("Missing required sequence file: FILE_1_NAME")
+
+            for file_num in (1, 2):
+                file_name = getattr(row, f"FILE_{file_num}_NAME", "")
+
+                if not file_name:
+                    continue
+
+                current_stage = "FILE_CHECK"
+                report.update_row(
+                    row_number=row_number,
+                    stage=current_stage,
+                    message=f"Checking sequence file {file_name}",
+                )
+
+                reads_directory = (
+                    csv_path.parent.parent / "reads" 
+                ).resolve()
+
+                file_path = ( 
+                    reads_directory / file_name 
+                ).resolve()
+
+                logger.info(f"Processing file: {file_name}")
+
+                if not file_path.is_relative_to(reads_directory):
+                    raise ValueError(
+                        f"Sequence file is outside the reads directory: {file_name}"
+                    )
+
+                if not file_path.is_file():
+                    raise FileNotFoundError(f"Sequence file not found: {file_path}")
+
+                
+                current_stage = "HASHING"
+                report.update_row(
+                    row_number=row_number,
+                    stage=current_stage,
+                    message=f"Calculating SHA-256 for {file_name}",
+                )
+
+                hash_value = create_hash(file_path)
+                sha256_values.append(hash_value)
+                report.update_row(
+                    row_number=row_number,
+                    sha256_values=sha256_values,
+                    message=f"SHA-256 created for {file_name}",
+                )
+
+                current_stage = "DOCUMENT_REFERENCE"
+                report.update_row(
+                    row_number=row_number,
+                    stage=current_stage,
+                    message=f"Creating DocumentReference for {file_name}",
+                )
+
+                doc_ref = build_document_reference(file_name, hash_value)
+                doc_id = api.post_doc_ref(doc_ref)
+
+                if not doc_id:
+                    raise RuntimeError(
+                        f"DEMIS returned no DocumentReference ID for {file_name}"
+                    )
+
+                document_reference_ids.append(doc_id)
+                report.update_row(
+                    row_number=row_number,
+                    document_reference_ids=document_reference_ids,
+                    message=f"DocumentReference created for {file_name}",
+                )
+
+                current_stage = "UPLOAD"
+                report.update_row(
+                    row_number=row_number,
+                    stage=current_stage,
+                    message=f"Fetching upload information for {file_name}",
+                )
+
+                size = os.path.getsize(file_path)
+                upload_info = api.get_presigned_url(doc_id, size)
+
+                if not isinstance(upload_info, dict):
+                    raise RuntimeError(
+                        f"Invalid upload information for {file_name}"
+                    )
+
+                upload_id = upload_info.get("uploadId")
+                urls = upload_info.get("presignedUrls")
+                part_size = upload_info.get("partSizeBytes")
+
+                if not upload_id or not urls or not part_size:
+                    raise RuntimeError(
+                        f"Incomplete upload information for {file_name}"
+                    )
+
+                upload_ids.append(upload_id)
+                report.update_row(
+                    row_number=row_number,
+                    upload_ids=upload_ids,
+                    message=f"Uploading {file_name}",
+                )
+
+                complete_body = api.put_file_chunks(
+                    file_path,
+                    part_size,
+                    urls,
+                    upload_id,
+                )
+                completed_chunks = (
+                    complete_body.get("completedChunks", [])
+                    if complete_body
+                    else []
+                )
+                chunks_complete = (
+                    len(completed_chunks) == len(urls)
+                    and all(chunk.get("eTag") for chunk in completed_chunks)
+                )
+
+                if not chunks_complete:
+                    raise RuntimeError(f"Chunk upload incomplete for {file_name}")
+
+                upload_finished = api.post_finish_upload(doc_id, complete_body)
+                if upload_finished.status_code != 204:
+                    raise RuntimeError(f"Failed to finish upload for {file_name}")
+
+                current_stage = "VALIDATION"
+                report.update_row(
+                    row_number=row_number,
+                    stage=current_stage,
+                    message=f"Starting validation for {file_name}",
+                )
+                logger.info(f"Starting validation for {file_name}")
+
+                validation_started = api.post_start_validation(doc_id)
+                if not validation_started:
+                    raise RuntimeError(
+                        f"Failed to start validation for {file_name}"
+                    )
+
+                validation_result = wait_for_validation(api, doc_id)
+                validation_status = validation_result.get("status", "UNKNOWN")
+                validation_statuses.append(validation_status)
+
+                report.update_row(
+                    row_number=row_number,
+                    validation_statuses=validation_statuses,
+                    message=(
+                        f"Validation status for {file_name}: "
+                        f"{validation_status}"
+                    ),
+                )
+
+                if validation_status != "VALID":
+                    raise ValueError(
+                        f"Validation failed for {file_name}: "
+                        f"{validation_status}"
+                    )
+
+                logger.info(
+                    "Validation was successful",
+                    extra={"color": "green"},
+                )
+
+            if not 1 <= len(document_reference_ids) <= 2:
+                raise ValueError(
+                    "One or two sequence files must complete validation"
+                )
+
+            current_stage = "NOTIFICATION"
+            report.update_row(
+                row_number=row_number,
+                stage=current_stage,
+                message="Sending final IGS notification",
+            )
+
+            result = send_notification(
+                api,
+                fhir_base_url,
+                row,
+                document_reference_ids,
+            )
 
             if result.status_code != 200:
                 report_fhir_error(
-                    result.json(),
+                    parse_fhir_response(result),
                     resource="Notification Bundle",
                     expected_profile=NOTIFICATION_BUNDLE_PROFILE,
                     output=typer.echo,
+                    outcome_directory=report.report_path,
+                )
+                raise RuntimeError(
+                    f"Notification failed with HTTP status {result.status_code}"
+                )
+
+            try:
+                response_body = result.json()
+            except ValueError:
+                run_successful = False
+                report.finish_row(
+                    row_number=row_number,
+                    status="NEEDS_REVIEW",
+                    stage="DONE",
+                    message=(
+                        "Notification was accepted, but the response was not JSON"
+                    ),
+                    error_type="InvalidResponse",
+                    filenames=requested_filenames,
+                    sha256_values=sha256_values,
+                    document_reference_ids=document_reference_ids,
+                    upload_ids=upload_ids,
+                    validation_statuses=validation_statuses,
                 )
                 continue
 
-            logger.info(
-                f"Notification for {notification_label} sent successfully.", 
-                extra={"color": "green"},
+            parameters = []
+            if isinstance(response_body, dict):
+                parameters = response_body.get("parameter", [])
+
+            notification_id = extract_param(
+                parameters,
+                "submitterGeneratedNotificationID",
+            )
+            transaction_id = extract_param(parameters, "transactionID")
+            lab_sequence_id = extract_param(parameters, "labSequenceID")
+
+            response_ids = {
+                "notification_id": notification_id,
+                "transaction_id": transaction_id,
+                "lab_sequence_id": lab_sequence_id,
+            }
+            missing_ids = [
+                name
+                for name, value in response_ids.items()
+                if not value
+            ]
+
+            if missing_ids:
+                run_successful = False
+                final_status = "NEEDS_REVIEW"
+                final_message = (
+                    "Notification was accepted, but response fields are missing: "
+                    + ", ".join(missing_ids)
+                )
+                error_type = "MissingResponseData"
+            else:
+                final_status = "SUCCESS"
+                final_message = "Upload and notification completed successfully"
+                error_type = ""
+
+            report.finish_row(
+                row_number=row_number,
+                status=final_status,
+                stage="DONE",
+                message=final_message,
+                error_type=error_type,
+                filenames=requested_filenames,
+                sha256_values=sha256_values,
+                document_reference_ids=document_reference_ids,
+                upload_ids=upload_ids,
+                validation_statuses=validation_statuses,
+                notification_id=notification_id or "",
+                transaction_id=transaction_id or "",
+                lab_sequence_id=lab_sequence_id or "",
             )
 
-            response_body = result.json()
-            if isinstance(response_body, dict) and "parameter" in response_body:
-                logger.info("Creating final report")
-                parameters = response_body["parameter"]
-                notification_id = extract_param(parameters, "submitterGeneratedNotificationID")
-                transaction_id = extract_param(parameters, "transactionID")
-                lab_sequence_id = extract_param(parameters, "labSequenceID")
-
-                report.create_report(
-                    filename=notification_label,
-                    notification_id=notification_id or "",
-                    transaction_id=transaction_id or "",
-                    lab_sequence_id=lab_sequence_id or "",
-                    document_reference_id=doc_ids,
-                    status="OK"
+            if final_status == "SUCCESS":
+                logger.info(
+                    f"Notification for {' and '.join(requested_filenames)} "
+                    "sent successfully.",
+                    extra={"color": "green"},
                 )
 
-        except Exception as e:
-            if hasattr(e, 'response') and e.response is not None:
-                resp = e.response
-                logger.error(f"Error {resp.status_code} sending notification for {notification_label}")
+        except Exception as exc:
+            run_successful = False
+            response = getattr(exc, "response", None)
+
+            if current_stage == "NOTIFICATION" and response is not None:
                 report_fhir_error(
-                    parse_fhir_response(resp),
+                    parse_fhir_response(response),
                     resource="Notification Bundle",
                     expected_profile=NOTIFICATION_BUNDLE_PROFILE,
                     output=typer.echo,
+                    outcome_directory=report.report_path,
                 )
-            else:
-                logger.error(f"Unexpected error for {notification_label}: {(str(e))}")
+
+            logger.error(
+                "Metadata row %s failed during %s: %s",
+                row_number,
+                current_stage,
+                exc,
+            )
+            report.finish_row(
+                row_number=row_number,
+                status="FAILED",
+                stage=current_stage,
+                message=str(exc),
+                error_type=type(exc).__name__,
+                filenames=requested_filenames,
+                sha256_values=sha256_values,
+                document_reference_ids=document_reference_ids,
+                upload_ids=upload_ids,
+                validation_statuses=validation_statuses,
+            )
+
+    return run_successful
 
 
 
@@ -194,10 +381,16 @@ def wait_for_validation(api: ApiClient, doc_id: str, max_wait_seconds: int = 300
     while time.monotonic() < deadline:
         result = api.get_validation_status(doc_id)
         current_time = time.time()
-        logger.info(f"Validation Status: {result.get("status")}, {current_time-start_time:.2f} seconds passed")
+        logger.info(
+            "Validation Status: %s, %.2f seconds passed",
+            result.get("status"),
+            current_time - start_time,
+        )
 
         if result.get("done") is True:
             return result
+
+        time.sleep(2)
 
     raise TimeoutError(
         f"Validation timed out for document {doc_id}"

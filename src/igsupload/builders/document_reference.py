@@ -7,7 +7,7 @@ def get_demis_content_type(file_name):
     # documentation: https://simplifier.net/rki.demis.igs/contenttype
     if file_name.endswith((".fastq", ".fq")):
         return "chemical/seq-na-fastq"
-    elif (file_name.endswith(".fastq.gz", ".fq.gz")):
+    elif file_name.endswith((".fastq.gz", ".fq.gz")):
         return "chemical/seq-na-fastq-gzip"
     elif file_name.endswith((".fasta", ".fa")):
         return "chemical/seq-na-fasta"
