@@ -1,14 +1,8 @@
-import uuid
 import re
-import requests
-import typer
-import json
-from datetime import datetime, timezone
+import uuid
+from datetime import UTC, datetime
 
-from igsupload.config import Settings
-import igsupload.auth.token_provider as token_module
 from igsupload.api.client import ApiClient
-from igsupload.utils.extract_csv import CsvRow
 from igsupload.builders.fhir_constants import (
     ADAPTER_SUBSTANCE_PROFILE,
     ADDRESS_USE_EXTENSION,
@@ -47,6 +41,7 @@ from igsupload.builders.fhir_constants import (
     SUBMITTING_FACILITY_PROFILE,
     SUBMITTING_ROLE_PROFILE,
 )
+from igsupload.utils.extract_csv import CsvRow
 
 IGS_SPEC_BASE = IGS_FHIR_BASE
 # Temporarily disabled: TEST-QS profile V5 has a known additive slicing bug.
@@ -194,7 +189,7 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
         referenced_notification_id,
         notification_id,
     )
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     patient_id = str(uuid.uuid4())
     organization_id = str(uuid.uuid4())
     practitioner_role_id = str(uuid.uuid4())
@@ -299,7 +294,7 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
         }]} if has_address else {})
     }
 
-    submitting_org_present = any(k for k in submitting_org_resource.keys() if k not in {"resourceType", "id", "meta"})
+    submitting_org_present = any(k for k in submitting_org_resource if k not in {"resourceType", "id", "meta"})
     submitting_org_entry = None
     submitting_role_entry = None
 

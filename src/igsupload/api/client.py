@@ -1,12 +1,12 @@
-import requests
 import logging
-
-from typing import Any
 from pathlib import Path
+from typing import Any
 
-from igsupload.utils.split_file import split_file_in_chunks
-from igsupload.auth.token_provider import TokenProvider
+import requests
+
 from igsupload.auth.bearer_auth import BearerAuth
+from igsupload.auth.token_provider import TokenProvider
+from igsupload.utils.split_file import split_file_in_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class ApiClient:
     def post_doc_ref(self, doc_ref):
         response = self._request(
             method='POST',
-            endpoint=f"/v5/fhir/DocumentReference",
+            endpoint="/v5/fhir/DocumentReference",
             payload=doc_ref,
         )
 
@@ -153,7 +153,7 @@ class ApiClient:
             
         response = self._request(
             method='POST',
-            endpoint=f"/v5/fhir/$process-notification-sequence",
+            endpoint="/v5/fhir/$process-notification-sequence",
             payload=bundle,
             headers=headers,
         )

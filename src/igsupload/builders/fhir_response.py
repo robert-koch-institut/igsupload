@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 import json
 import os
-from pathlib import Path
 import re
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import typer
-
 
 OutputFunction = Callable[[str], None]
 

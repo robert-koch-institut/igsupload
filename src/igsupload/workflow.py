@@ -1,20 +1,19 @@
+import logging
 import os
 import time
-import logging
-import typer
-
 from pathlib import Path
 
+import typer
+
 from igsupload.api.client import ApiClient
-from igsupload.utils.extract_csv import read_csv
 from igsupload.builders.document_reference import build_document_reference
-from igsupload.utils.sha256_hash import create_hash
-from igsupload.utils.demis_response import extract_param
+from igsupload.builders.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
+from igsupload.builders.fhir_response import parse_fhir_response, report_fhir_error
 from igsupload.builders.igs_notification import send_notification
 from igsupload.log.upload_report import UploadReport
-from igsupload.builders.fhir_response import parse_fhir_response, report_fhir_error
-from igsupload.builders.fhir_constants import NOTIFICATION_BUNDLE_PROFILE
-
+from igsupload.utils.demis_response import extract_param
+from igsupload.utils.extract_csv import read_csv
+from igsupload.utils.sha256_hash import create_hash
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +149,7 @@ def start(
                 upload_info = api.get_presigned_url(doc_id, size)
 
                 if not isinstance(upload_info, dict):
-                    raise RuntimeError(
+                    raise TypeError(
                         f"Invalid upload information for {file_name}"
                     )
 
@@ -340,7 +339,7 @@ def start(
                     extra={"color": "green"},
                 )
 
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             run_successful = False
             response = getattr(exc, "response", None)
 

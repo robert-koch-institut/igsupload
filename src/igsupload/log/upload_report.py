@@ -2,10 +2,8 @@ import csv
 import json
 import time
 import uuid
-
 from datetime import UTC, datetime
 from pathlib import Path
-
 
 REPORT_FIELDS = [
     "timestamp_utc",

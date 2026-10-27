@@ -1,6 +1,5 @@
-import base64
-import re
 import hashlib
+
 
 def create_hash(file_path):
   sha256 = hashlib.sha256()

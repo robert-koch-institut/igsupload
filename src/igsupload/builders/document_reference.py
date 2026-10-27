@@ -1,7 +1,9 @@
+from datetime import UTC, datetime
+
 import typer
-from datetime import datetime, UTC
 
 from igsupload.builders.fhir_constants import SEQUENCE_DOCUMENT_PROFILE
+
 
 def get_demis_content_type(file_name):
     # documentation: https://simplifier.net/rki.demis.igs/contenttype

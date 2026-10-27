@@ -1,5 +1,6 @@
-import time
 import threading
+import time
+
 import requests
 
 from igsupload.config import Settings

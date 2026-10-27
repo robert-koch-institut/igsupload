@@ -1,17 +1,15 @@
-import requests
 import logging
+from pathlib import Path
+
+import requests
 import typer
 
-from pathlib import Path
-from typing import Optional
-
-from igsupload.config import Settings
-from igsupload.auth.token_provider import TokenProvider
 from igsupload.api.client import ApiClient
+from igsupload.auth.token_provider import TokenProvider
+from igsupload.config import Settings, load_env
+from igsupload.log.setup_igsupload_logger import setup_logging
 from igsupload.log.upload_report import UploadReport
 from igsupload.workflow import start
-from igsupload.config import load_env
-from igsupload.log.setup_igsupload_logger import setup_logging
 
 app = typer.Typer(add_completion=False)
 logger = logging.getLogger(__name__)
@@ -48,13 +46,13 @@ def help_cmd():
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    csv: Optional[Path] = typer.Option(
+    csv: Path | None = typer.Option(
         None, "--csv", help="Path to metadata CSV file", exists=False, show_default=False
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None, "--config", help="Optional path to a .env file (overrides auto-detection)", exists=False, show_default=False
     ),
-    log_path: Optional[Path] = typer.Option(
+    log_path: Path | None = typer.Option(
         None, "--log", help="Optional path to a log file. If not set it will be put into the logging/ dircetory", exists=False, show_default=False
     ),
 ):

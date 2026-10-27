@@ -1,11 +1,11 @@
-import sys
 import logging
+import sys
 from pathlib import Path
 
 from rich.console import Console
-from igsupload.utils.colored_rich_handler import ColoredRichHandler
 
 from igsupload.log.setup_logging_path import setup_path
+from igsupload.utils.colored_rich_handler import ColoredRichHandler
 
 
 def setup_logging(log_dir: Path | None = None) -> Path:

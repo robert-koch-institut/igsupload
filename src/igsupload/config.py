@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 REQUIRED_KEYS = [
     "CERT_URL",
     "KEY_URL",

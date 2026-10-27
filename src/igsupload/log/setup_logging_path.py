@@ -1,8 +1,8 @@
 import datetime
-
 from pathlib import Path
 
 from igsupload.utils.generate_code import get_four_digit_code
+
 
 def setup_path(log_dir: Path | None = None) -> Path:
     if not log_dir:
