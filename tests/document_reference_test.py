@@ -1,55 +1,49 @@
-import pytest
-from unittest import mock
 from datetime import datetime
-import requests
-import time
 
-from igsupload.fhir_builder import document_reference as dc_manager
+import pytest
 
-def test_get_demis_content_type():
-    fastq_response = dc_manager.get_demis_content_type("test.fastq")
-    fasta_response = dc_manager.get_demis_content_type("test.fasta")
+from igsupload.builders.document_reference import (
+    build_document_reference,
+    get_demis_content_type,
+)
+from igsupload.builders.fhir_constants import SEQUENCE_DOCUMENT_PROFILE
 
-    assert fastq_response == "application/fastq"
-    assert fasta_response == "application/fasta"
-    with pytest.raises(ValueError):
-        dc_manager.get_demis_content_type("error.txt")
 
-def test_build_document_reference():
-    fake_time = datetime(2023, 1, 1, 12, 0, 0)
-    test_file = "test.fastq"
-    hash = "test_hash"
+@pytest.mark.parametrize(
+    ("file_name", "content_type"),
+    [
+        ("sample.fastq", "chemical/seq-na-fastq"),
+        ("sample.fq", "chemical/seq-na-fastq"),
+        ("sample.fastq.gz", "chemical/seq-na-fastq-gzip"),
+        ("sample.fq.gz", "chemical/seq-na-fastq-gzip"),
+        ("sample.fasta", "chemical/seq-na-fasta"),
+        ("sample.fa", "chemical/seq-na-fasta"),
+        ("sample.fasta.gz", "chemical/seq-na-fasta-gzip"),
+        ("sample.fa.gz", "chemical/seq-na-fasta-gzip"),
+    ],
+)
+def test_supported_sequence_formats_have_demis_content_type(
+    file_name,
+    content_type,
+):
+    assert get_demis_content_type(file_name) == content_type
 
-    expected_result = {
-        "resourceType": "DocumentReference",
-        "status": "current",
-        "type": {
-            "coding": [
-                {
-                    "system": "http://snomed.info/sct",
-                    "code": "258207000",
-                    "display": "Molecular sequence data (finding)"
-                }
-            ]
-        },
-        "date": fake_time.isoformat(),
-        "description": f"Sequenzdatei {test_file}",
-        "content": [
-            {
-                "attachment": {
-                    "contentType": "application/fastq",
-                    "title": test_file,
-                    "hash": hash,
-                    "url": ""
-                }
-            }
-        ]
+
+def test_unknown_sequence_format_is_rejected():
+    with pytest.raises(ValueError, match="fileformat"):
+        get_demis_content_type("sample.txt")
+
+
+def test_document_reference_contains_file_identity_and_profile():
+    result = build_document_reference("sample.fq.gz", "abc123")
+    attachment = result["content"][0]["attachment"]
+
+    assert result["resourceType"] == "DocumentReference"
+    assert result["meta"]["profile"] == [SEQUENCE_DOCUMENT_PROFILE]
+    assert result["status"] == "current"
+    assert attachment == {
+        "contentType": "chemical/seq-na-fastq-gzip",
+        "title": "sample.fq.gz",
+        "hash": "abc123",
     }
-
-    with mock.patch("src.igsupload.document_reference.datetime") as mock_datetime:
-        mock_datetime.now.return_value = fake_time
-        mock_datetime.utcnow.return_value = fake_time
-
-        doc_reference = dc_manager.build_document_reference(test_file, hash)
-
-    assert doc_reference == expected_result
+    assert datetime.fromisoformat(result["date"]).tzinfo is not None

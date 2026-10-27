@@ -32,6 +32,7 @@ def start(
     rows = read_csv(csv_path)
     report_rows = []
 
+    # init igsupload report
     for row_number, row in enumerate(rows, start=1):
         filenames = []
         if row.FILE_1_NAME:
@@ -49,6 +50,7 @@ def start(
 
     run_successful = True
 
+    # start of actual workflow
     for row_number, row in enumerate(rows, start=1):
         requested_filenames = []
         if row.FILE_1_NAME:

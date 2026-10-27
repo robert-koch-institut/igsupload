@@ -20,7 +20,6 @@ igsupload = "igsupload.main:app"
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "pytest-mock>=3.16.0",
     "ruff>=0.17.0",
 ]
 
@@ -34,3 +33,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
