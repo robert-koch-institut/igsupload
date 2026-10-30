@@ -4,9 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from igsupload.auth.load_cert import load_pkcs12
+
 REQUIRED_KEYS = [
-    "CERT_URL",
-    "KEY_URL",
+    "PKCS12_PATH",
+    "PASSWORD",
     "CLIENT_ID",
     "CLIENT_SECRET",
     "USERNAME",
@@ -53,13 +55,15 @@ def load_env(path: Path | None = None) -> Settings:
             f"Missing configuration values: {', '.join(missing_keys)}"
         )
 
+    cert, key = load_pkcs12(Path(os.environ.get("PKCS12_PATH")), os.environ.get("PASSWORD"))
+
 
     return Settings(
-        cert=os.environ["CERT_URL"],
-        key=os.environ["KEY_URL"],
-        client_id=os.environ["CLIENT_ID"],
-        client_secret=os.environ["CLIENT_SECRET"],
-        username=os.environ["USERNAME"],
-        base_url=os.environ["BASE_URL"],
-        token_url=os.environ["TOKEN_URL"],
+        cert=cert,
+        key=key,
+        client_id=os.environ.get("CLIENT_ID"),
+        client_secret=os.environ.get("CLIENT_SECRET"),
+        username=os.environ.get("USERNAME"),
+        base_url=os.environ.get("BASE_URL"),
+        token_url=os.environ.get("TOKEN_URL"),
     )

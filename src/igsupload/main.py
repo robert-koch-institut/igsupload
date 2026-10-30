@@ -94,8 +94,8 @@ def main(
     api = ApiClient(
         base_url=cfg.base_url,
         token_provider=token_provider,
-        cert_path=cfg.cert,
-        key_path=cfg.key,
+        cert=cfg.cert,
+        key=cfg.key,
     )
 
 

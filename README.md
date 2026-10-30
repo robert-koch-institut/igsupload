@@ -54,7 +54,6 @@ This project automates the submission of sequencing data and associated metadata
 
 ### Prerequisites
 
-- Python 3.13 or newer
 - [uv](https://docs.astral.sh/uv/) installed on your system
 - Git
 
@@ -103,7 +102,7 @@ uv run pytest
 Run tests with coverage:
 
 ```bash
-uv run pytest --cov=igsupload
+uv run pytest --cov=src
 ```
 
 Check code quality:
@@ -111,7 +110,6 @@ Check code quality:
 ```bash
 uv run ruff check .
 ```
-This option is used, if you want to install and execute pytest. 
 
 Format the code:
 
@@ -124,8 +122,8 @@ uv run ruff format .
 Modify the .env file with your credentials. Use the **.env.template** file as a template for yours:
 
 ```bash
-CERT_URL="/url/to/cert.pem"
-KEY_URL="/url/to/key.pem"
+PKCS12_PATH="path/to/cert.p12
+PASSWORD="password"
 
 # more infos regarding the Client_Id and Client_Secret is here:
 # https://wiki.gematik.de/spaces/DSKB/pages/471343260/Endpunkte+Zertifikate+User+und+Passwort
@@ -134,15 +132,7 @@ CLIENT_SECRET="your-client-secret"
 USERNAME="your-username"
 
 BASE_URL="https://API-Base-URL"
-```
-
-You will probably receive a .p12 certificate from DEMIS. For this appiclication you will need a key.pem and cert.pem file. With these two bash commands you are able to convert the .p12 certificate in the key.pem and cert.pem files.
-
-```bash
-# <path-to-p12> = Pfad zur .p12-Datei
-openssl pkcs12 -in <path-to-p12> -clcerts -nokeys -out cert.pem --legacy
-
-openssl pkcs12 -in <path-to-p12> -nocerts -nodes -out key.pem --legacy
+TOKEN_URL="https://TOKEN-Base-URL"
 ```
 
 ## Usage
@@ -225,8 +215,6 @@ igs-upload/
 
 ### Issue: ProxyError or 403 Forbidden
 
-- Check your network and proxy settings.
-
 - Ensure access to the DEMIS test environment is available from your network.
 
 ### Issue: Validation failed ("Hash does not match")
@@ -242,20 +230,6 @@ igs-upload/
 - Supported formats: FASTA, FASTQ, and their GZIP-compressed forms.
 
 - Verify file extensions and integrity.
-
-## Testing
-
-Run tests with pytest:
-
-```bash
-pytest tests/
-```
-
-For Coverage:
-
-```bash
-pytest --cov=src
-```
 
 ## Authors
 
