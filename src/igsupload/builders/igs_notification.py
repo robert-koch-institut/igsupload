@@ -120,12 +120,16 @@ def _sequencing_substance_entry(
             "resourceType": "Substance",
             "id": substance_id,
             "meta": {"profile": [profile]},
-            "category": [{
-                "coding": [{
-                    "system": SEQUENCING_SUBSTANCES_SYSTEM,
-                    "code": category_code,
-                }]
-            }],
+            "category": [
+                {
+                    "coding": [
+                        {
+                            "system": SEQUENCING_SUBSTANCES_SYSTEM,
+                            "code": category_code,
+                        }
+                    ]
+                }
+            ],
             "code": {"text": value},
         },
     }
@@ -164,17 +168,19 @@ SNOMED_UPLOAD_STATUS = {
     "accepted": "385645004",
     "planned": "397943006",
     "denied": "441889009",
-    "other": "74964007"
+    "other": "74964007",
 }
 SEQ_REASON_TO_SNOMED = {
     "random": "255226008",
     "requested": "385644000",
     "clinical": "58147004",
-    "other": "74964007"
+    "other": "74964007",
 }
 
 
-def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]) -> dict:
+def build_notification_bundle(
+    base_url_path: str, row: CsvRow, doc_ids: list[str]
+) -> dict:
     if not 1 <= len(doc_ids) <= 2:
         raise ValueError(
             "An IGS notification must reference one or two sequence documents."
@@ -198,72 +204,90 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
     adapters = []
     if _nz(row.ADAPTER):
         adapters = [
-            adapter.strip()
-            for adapter in row.ADAPTER.split("+", 1)
-            if adapter.strip()
+            adapter.strip() for adapter in row.ADAPTER.split("+", 1) if adapter.strip()
         ]
 
     # --- Notifier/Sequenzierlabor ---
     org_identifier_value = _nz(row.SEQUENCING_LAB_DEMIS_LAB_ID)
     org_name = _nz(row.SEQUENCING_LAB_NAME) or "Unknown laboratory"
-    org_email = row.SEQUENCING_LAB_EMAIL if _valid_email(row.SEQUENCING_LAB_EMAIL) else "noreply@example.org"
+    org_email = (
+        row.SEQUENCING_LAB_EMAIL
+        if _valid_email(row.SEQUENCING_LAB_EMAIL)
+        else "noreply@example.org"
+    )
     org_address_line = _nz(row.SEQUENCING_LAB_ADDRESS) or "Unknown street 1"
     org_city = _nz(row.SEQUENCING_LAB_CITY) or "Unbekannt"
     org_postal = _nz(row.SEQUENCING_LAB_POSTAL_CODE) or "00000"
     org_state = _nz(row.SEQUENCING_LAB_FEDERAL_STATE) or "DE-XX"
 
     org_resource = {
-        'resourceType': 'Organization',
-        'id': organization_id,
-        'meta': {'profile': [NOTIFIER_FACILITY_PROFILE]},
-        **({
-            'identifier': [{
-                'system': DEMIS_PARTICIPANT_ID_SYSTEM,
-                'value': org_identifier_value
-            }]
-        } if org_identifier_value else {}),
-        "type": [{
-            "coding": [{
-                "system": ORGANIZATION_TYPE_SYSTEM,
-                "code": "refLab",
-                "display": "Einrichtung der Spezialdiagnostik"
-            }]
-        }],
-        'name': org_name,
+        "resourceType": "Organization",
+        "id": organization_id,
+        "meta": {"profile": [NOTIFIER_FACILITY_PROFILE]},
+        **(
+            {
+                "identifier": [
+                    {
+                        "system": DEMIS_PARTICIPANT_ID_SYSTEM,
+                        "value": org_identifier_value,
+                    }
+                ]
+            }
+            if org_identifier_value
+            else {}
+        ),
+        "type": [
+            {
+                "coding": [
+                    {
+                        "system": ORGANIZATION_TYPE_SYSTEM,
+                        "code": "refLab",
+                        "display": "Einrichtung der Spezialdiagnostik",
+                    }
+                ]
+            }
+        ],
+        "name": org_name,
         "telecom": [{"system": "email", "value": org_email, "use": "work"}],
-        'address': [{
-            'line': [org_address_line],
-            'city': org_city,
-            'postalCode': org_postal,
-            'country': 'DE',
-            "state": org_state,
-        }]
+        "address": [
+            {
+                "line": [org_address_line],
+                "city": org_city,
+                "postalCode": org_postal,
+                "country": "DE",
+                "state": org_state,
+            }
+        ],
     }
 
     org_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Organization/{organization_id}',
-        'resource': org_resource
+        "fullUrl": f"{IGS_SPEC_BASE}/Organization/{organization_id}",
+        "resource": org_resource,
     }
 
     practitioner_role_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/PractitionerRole/{practitioner_role_id}',
-        'resource': {
-            'resourceType': 'PractitionerRole',
-            'id': practitioner_role_id,
-            'meta': {'profile': [NOTIFIER_ROLE_PROFILE]},
-            'organization': {'reference': f'Organization/{organization_id}'}
-        }
+        "fullUrl": f"{IGS_SPEC_BASE}/PractitionerRole/{practitioner_role_id}",
+        "resource": {
+            "resourceType": "PractitionerRole",
+            "id": practitioner_role_id,
+            "meta": {"profile": [NOTIFIER_ROLE_PROFILE]},
+            "organization": {"reference": f"Organization/{organization_id}"},
+        },
     }
 
     # --- Submitting (Primär-/Diagnostiklabor aus CSV) ---
     submitting_org_id = str(uuid.uuid4())
     submitting_role_id = str(uuid.uuid4())
 
-    sub_name  = _nz(row.PRIME_DIAGNOSTIC_LAB_NAME)
-    sub_email = row.PRIME_DIAGNOSTIC_LAB_EMAIL if _valid_email(row.PRIME_DIAGNOSTIC_LAB_EMAIL) else None
-    sub_addr  = _nz(row.PRIME_DIAGNOSTIC_LAB_ADDRESS)
-    sub_city  = _nz(row.PRIME_DIAGNOSTIC_LAB_CITY)
-    sub_post  = _nz(row.PRIME_DIAGNOSTIC_LAB_POSTAL_CODE)
+    sub_name = _nz(row.PRIME_DIAGNOSTIC_LAB_NAME)
+    sub_email = (
+        row.PRIME_DIAGNOSTIC_LAB_EMAIL
+        if _valid_email(row.PRIME_DIAGNOSTIC_LAB_EMAIL)
+        else None
+    )
+    sub_addr = _nz(row.PRIME_DIAGNOSTIC_LAB_ADDRESS)
+    sub_city = _nz(row.PRIME_DIAGNOSTIC_LAB_CITY)
+    sub_post = _nz(row.PRIME_DIAGNOSTIC_LAB_POSTAL_CODE)
     sub_labid = _nz(row.PRIME_DIAGNOSTIC_LAB_DEMIS_LAB_ID)
     sub_state = _nz(row.PRIME_DIAGNOSTIC_LAB_FEDERAL_STATE) or "DE-XX"
 
@@ -274,45 +298,63 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
     submitting_org_resource = {
         "resourceType": "Organization",
         "id": submitting_org_id,
-        **({"meta": {"profile": [SUBMITTING_FACILITY_PROFILE]}}
-           if can_claim_submitting_profile else {}),
-        **({
-            "identifier": [{
-                "system": DEMIS_LABORATORY_ID_SYSTEM,
-                "value": sub_labid
-            }]
-        } if sub_labid else {}),
+        **(
+            {"meta": {"profile": [SUBMITTING_FACILITY_PROFILE]}}
+            if can_claim_submitting_profile
+            else {}
+        ),
+        **(
+            {"identifier": [{"system": DEMIS_LABORATORY_ID_SYSTEM, "value": sub_labid}]}
+            if sub_labid
+            else {}
+        ),
         **({"name": sub_name} if sub_name else {}),
-        **({"telecom": [{"system": "email", "value": sub_email, "use": "work"}]}
-            if has_telecom else {}),
-        **({"address": [{
-            **({"line": [sub_addr]} if sub_addr else {}),
-            **({"city": sub_city} if sub_city else {}),
-            **({"postalCode": sub_post} if sub_post else {}),
-            **({"state": sub_state} if sub_state else {}),
-            "country": "DE"
-        }]} if has_address else {})
+        **(
+            {"telecom": [{"system": "email", "value": sub_email, "use": "work"}]}
+            if has_telecom
+            else {}
+        ),
+        **(
+            {
+                "address": [
+                    {
+                        **({"line": [sub_addr]} if sub_addr else {}),
+                        **({"city": sub_city} if sub_city else {}),
+                        **({"postalCode": sub_post} if sub_post else {}),
+                        **({"state": sub_state} if sub_state else {}),
+                        "country": "DE",
+                    }
+                ]
+            }
+            if has_address
+            else {}
+        ),
     }
 
-    submitting_org_present = any(k for k in submitting_org_resource if k not in {"resourceType", "id", "meta"})
+    submitting_org_present = any(
+        k for k in submitting_org_resource if k not in {"resourceType", "id", "meta"}
+    )
     submitting_org_entry = None
     submitting_role_entry = None
 
     if submitting_org_present:
         submitting_org_entry = {
             "fullUrl": f"{IGS_SPEC_BASE}/Organization/{submitting_org_id}",
-            "resource": submitting_org_resource
+            "resource": submitting_org_resource,
         }
         submitting_role_resource = {
             "resourceType": "PractitionerRole",
             "id": submitting_role_id,
-            **({"meta": {"profile": [SUBMITTING_ROLE_PROFILE]}}
-               if can_claim_submitting_profile else {}),
-            "organization": {"reference": f"Organization/{submitting_org_id}"}
+            **(
+                {"meta": {"profile": [SUBMITTING_ROLE_PROFILE]}}
+                if can_claim_submitting_profile
+                else {}
+            ),
+            "organization": {"reference": f"Organization/{submitting_org_id}"},
         }
         submitting_role_entry = {
             "fullUrl": f"{IGS_SPEC_BASE}/PractitionerRole/{submitting_role_id}",
-            "resource": submitting_role_resource
+            "resource": submitting_role_resource,
         }
 
     # --- Patient ---
@@ -322,26 +364,36 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
     geo_postal = _nz(row.GEOGRAPHIC_LOCATION)
 
     patient_resource = {
-        'resourceType': 'Patient',
-        'id': patient_id,
-        'meta': {'profile': [NOTIFIED_PERSON_ANONYMOUS_PROFILE]},
-        **({'gender': gender} if gender else {}),
-        **({'birthDate': birth_date} if birth_date else {}),
-        **({"address": [{
-            "extension": [{
-                "url": ADDRESS_USE_EXTENSION,
-                "valueCoding": {
-                    "system": ADDRESS_USE_SYSTEM,
-                    "code": "primary"
-                }
-            }],
-            "postalCode": geo_postal
-        }]} if geo_postal else {})
+        "resourceType": "Patient",
+        "id": patient_id,
+        "meta": {"profile": [NOTIFIED_PERSON_ANONYMOUS_PROFILE]},
+        **({"gender": gender} if gender else {}),
+        **({"birthDate": birth_date} if birth_date else {}),
+        **(
+            {
+                "address": [
+                    {
+                        "extension": [
+                            {
+                                "url": ADDRESS_USE_EXTENSION,
+                                "valueCoding": {
+                                    "system": ADDRESS_USE_SYSTEM,
+                                    "code": "primary",
+                                },
+                            }
+                        ],
+                        "postalCode": geo_postal,
+                    }
+                ]
+            }
+            if geo_postal
+            else {}
+        ),
     }
 
     patient_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Patient/{patient_id}',
-        'resource': patient_resource
+        "fullUrl": f"{IGS_SPEC_BASE}/Patient/{patient_id}",
+        "resource": patient_resource,
     }
 
     # --- Sequenzierung ---
@@ -382,84 +434,117 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
             for entry in adapter_entries
         ]
         if primer_entry:
-            specimen_additives.append({
-                "reference": f"Substance/{primer_entry['resource']['id']}"
-            })
+            specimen_additives.append(
+                {"reference": f"Substance/{primer_entry['resource']['id']}"}
+            )
 
     collector_ref = (
-        f'PractitionerRole/{submitting_role_id}'
+        f"PractitionerRole/{submitting_role_id}"
         if submitting_role_entry is not None
-        else f'PractitionerRole/{practitioner_role_id}'
+        else f"PractitionerRole/{practitioner_role_id}"
     )
 
     specimen_resource = {
-        'resourceType': 'Specimen',
-        'id': specimen_id,
-        'meta': {'profile': [SPECIMEN_PROFILE]},
-        'status': 'available',
-        **({
-            'extension': [{
-                'url': ISOLATE_EXTENSION,
-                'valueString': _nz(row.ISOLATE)
-            }]
-        } if _nz(row.ISOLATE) else {}),
-        'type': {
-            'coding': [{
-                'system': 'http://snomed.info/sct',
-                'version': SNOMED_CT_VERSION,
-                **({'code': _nz(row.ISOLATION_SOURCE_CODE)} if _nz(row.ISOLATION_SOURCE_CODE) else {}),
-                **({'display': _nz(row.ISOLATION_SOURCE)} if _nz(row.ISOLATION_SOURCE) else {})
-            }]
-        },
-        'subject': {'reference': f'Patient/{patient_id}'},
-        **({'receivedTime': spec_received} if spec_received else {}),
-        'collection': {
-            'collector': {'reference': collector_ref},
-            **({'collectedDateTime': spec_collected} if spec_collected else {})
-        },
-        'processing': [{
-            **({'description': _nz(row.NAME_AMP_PROTOCOL)} if _nz(row.NAME_AMP_PROTOCOL) else {}),
-            **({
-                'procedure': {
-                    'coding': [{
-                        'system': SEQUENCING_STRATEGY_SYSTEM,
-                        'code': _nz(row.SEQUENCING_STRATEGY)
-                    }]
+        "resourceType": "Specimen",
+        "id": specimen_id,
+        "meta": {"profile": [SPECIMEN_PROFILE]},
+        "status": "available",
+        **(
+            {"extension": [{"url": ISOLATE_EXTENSION, "valueString": _nz(row.ISOLATE)}]}
+            if _nz(row.ISOLATE)
+            else {}
+        ),
+        "type": {
+            "coding": [
+                {
+                    "system": "http://snomed.info/sct",
+                    "version": SNOMED_CT_VERSION,
+                    **(
+                        {"code": _nz(row.ISOLATION_SOURCE_CODE)}
+                        if _nz(row.ISOLATION_SOURCE_CODE)
+                        else {}
+                    ),
+                    **(
+                        {"display": _nz(row.ISOLATION_SOURCE)}
+                        if _nz(row.ISOLATION_SOURCE)
+                        else {}
+                    ),
                 }
-            } if _nz(row.SEQUENCING_STRATEGY) else {}),
-            **({'additive': specimen_additives} if specimen_additives else {}),
-            **({'timeDateTime': spec_sequenced} if spec_sequenced else {})
-        }]
+            ]
+        },
+        "subject": {"reference": f"Patient/{patient_id}"},
+        **({"receivedTime": spec_received} if spec_received else {}),
+        "collection": {
+            "collector": {"reference": collector_ref},
+            **({"collectedDateTime": spec_collected} if spec_collected else {}),
+        },
+        "processing": [
+            {
+                **(
+                    {"description": _nz(row.NAME_AMP_PROTOCOL)}
+                    if _nz(row.NAME_AMP_PROTOCOL)
+                    else {}
+                ),
+                **(
+                    {
+                        "procedure": {
+                            "coding": [
+                                {
+                                    "system": SEQUENCING_STRATEGY_SYSTEM,
+                                    "code": _nz(row.SEQUENCING_STRATEGY),
+                                }
+                            ]
+                        }
+                    }
+                    if _nz(row.SEQUENCING_STRATEGY)
+                    else {}
+                ),
+                **({"additive": specimen_additives} if specimen_additives else {}),
+                **({"timeDateTime": spec_sequenced} if spec_sequenced else {}),
+            }
+        ],
     }
 
     specimen_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Specimen/{specimen_id}',
-        'resource': specimen_resource
+        "fullUrl": f"{IGS_SPEC_BASE}/Specimen/{specimen_id}",
+        "resource": specimen_resource,
     }
 
     # --- Device ---
     device_id = str(uuid.uuid4())
     device_resource = {
-        'resourceType': 'Device',
-        'id': device_id,
-        'meta': {'profile': [SEQUENCING_DEVICE_PROFILE]},
-        **({
-            'deviceName': [{'name': _nz(row.SEQUENCING_INSTRUMENT), 'type': 'model-name'}]
-        } if _nz(row.SEQUENCING_INSTRUMENT) else {}),
-        **({
-            'type': {
-                'coding': [{
-                    'system': SEQUENCING_PLATFORM_SYSTEM,
-                    'code': _nz(row.SEQUENCING_PLATFORM),
-                    'display': _nz(row.SEQUENCING_PLATFORM)
-                }]
+        "resourceType": "Device",
+        "id": device_id,
+        "meta": {"profile": [SEQUENCING_DEVICE_PROFILE]},
+        **(
+            {
+                "deviceName": [
+                    {"name": _nz(row.SEQUENCING_INSTRUMENT), "type": "model-name"}
+                ]
             }
-        } if _nz(row.SEQUENCING_PLATFORM) else {})
+            if _nz(row.SEQUENCING_INSTRUMENT)
+            else {}
+        ),
+        **(
+            {
+                "type": {
+                    "coding": [
+                        {
+                            "system": SEQUENCING_PLATFORM_SYSTEM,
+                            "code": _nz(row.SEQUENCING_PLATFORM),
+                            "display": _nz(row.SEQUENCING_PLATFORM),
+                        }
+                    ]
+                }
+            }
+            if _nz(row.SEQUENCING_PLATFORM)
+            else {}
+        ),
     }
 
     device_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Device/{device_id}',
-        'resource': device_resource
+        "fullUrl": f"{IGS_SPEC_BASE}/Device/{device_id}",
+        "resource": device_resource,
     }
 
     # --- IDs ---
@@ -484,32 +569,32 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
             else SNOMED_UPLOAD_STATUS["planned"]
         )
 
-    repo_extensions = [{
-        "url": SEQUENCE_UPLOAD_STATUS_EXTENSION,
-        "valueCoding": {
-            "system": "http://snomed.info/sct",
-            "code": status_code
+    repo_extensions = [
+        {
+            "url": SEQUENCE_UPLOAD_STATUS_EXTENSION,
+            "valueCoding": {"system": "http://snomed.info/sct", "code": status_code},
         }
-    }]
+    ]
 
     upload_date = _fmt_date_or_datetime(row.UPLOAD_DATE)
     if upload_date:
-        repo_extensions.append({
-            "url": SEQUENCE_UPLOAD_DATE_EXTENSION,
-            "valueDateTime": upload_date
-        })
+        repo_extensions.append(
+            {"url": SEQUENCE_UPLOAD_DATE_EXTENSION, "valueDateTime": upload_date}
+        )
     if _nz(row.UPLOAD_SUBMITTER):
-        repo_extensions.append({
-            "url": SEQUENCE_UPLOAD_SUBMITTER_EXTENSION,
-            "valueString": _nz(row.UPLOAD_SUBMITTER)
-        })
+        repo_extensions.append(
+            {
+                "url": SEQUENCE_UPLOAD_SUBMITTER_EXTENSION,
+                "valueString": _nz(row.UPLOAD_SUBMITTER),
+            }
+        )
 
     repository = {
         "name": repo_name,
         **({"url": _nz(row.REPOSITORY_LINK)} if _nz(row.REPOSITORY_LINK) else {}),
         **({"datasetId": _nz(row.REPOSITORY_ID)} if _nz(row.REPOSITORY_ID) else {}),
         "type": "other",
-        "extension": repo_extensions
+        "extension": repo_extensions,
     }
 
     # --- Sequencing reason & SequenceAuthor ---
@@ -526,40 +611,47 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
 
     if _nz(row.SEQUENCING_REASON):
         key = _nz(row.SEQUENCING_REASON).lower()
-        code = SEQ_REASON_TO_SNOMED.get(key) or (_nz(row.SEQUENCING_REASON) if re.fullmatch(r"\d+", _nz(row.SEQUENCING_REASON)) else None)
+        code = SEQ_REASON_TO_SNOMED.get(key) or (
+            _nz(row.SEQUENCING_REASON)
+            if re.fullmatch(r"\d+", _nz(row.SEQUENCING_REASON))
+            else None
+        )
         if code:
-            seq_extensions.insert(0, {
-                "url": SEQUENCING_REASON_EXTENSION,
-                "valueCoding": {
-                    "system": "http://snomed.info/sct",
-                    "code": code
-                }
-            })
+            seq_extensions.insert(
+                0,
+                {
+                    "url": SEQUENCING_REASON_EXTENSION,
+                    "valueCoding": {"system": "http://snomed.info/sct", "code": code},
+                },
+            )
 
     author_txt = _nz(row.AUTHOR)
     if author_txt:
-        seq_extensions.insert(0, {
-            "url": SEQUENCE_AUTHOR_EXTENSION,
-            "valueString": author_txt
-        })
+        seq_extensions.insert(
+            0, {"url": SEQUENCE_AUTHOR_EXTENSION, "valueString": author_txt}
+        )
 
     # --- MolecularSequence ---
     molecular_sequence_resource = {
-        'resourceType': 'MolecularSequence',
-        'id': sequence_id,
-        'meta': {'profile': [MOLECULAR_SEQUENCE_PROFILE]},
-        'coordinateSystem': 1,
-        'specimen': {'reference': f'Specimen/{specimen_id}'},
-        'device': {'reference': f'Device/{device_id}'},
-        'extension': seq_extensions,
-        **({'identifier': [{"value": _nz(row.LAB_SEQUENCE_ID)}]} if _nz(row.LAB_SEQUENCE_ID) else {}),
+        "resourceType": "MolecularSequence",
+        "id": sequence_id,
+        "meta": {"profile": [MOLECULAR_SEQUENCE_PROFILE]},
+        "coordinateSystem": 1,
+        "specimen": {"reference": f"Specimen/{specimen_id}"},
+        "device": {"reference": f"Device/{device_id}"},
+        "extension": seq_extensions,
+        **(
+            {"identifier": [{"value": _nz(row.LAB_SEQUENCE_ID)}]}
+            if _nz(row.LAB_SEQUENCE_ID)
+            else {}
+        ),
         "performer": {"reference": f"Organization/{organization_id}"},
-        "repository": [repository]
+        "repository": [repository],
     }
 
     molecular_sequence_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/MolecularSequence/{sequence_id}',
-        'resource': molecular_sequence_resource
+        "fullUrl": f"{IGS_SPEC_BASE}/MolecularSequence/{sequence_id}",
+        "resource": molecular_sequence_resource,
     }
 
     # --- Observation ---
@@ -567,148 +659,208 @@ def build_notification_bundle(base_url_path:str, row: CsvRow, doc_ids: list[str]
     obs_display = _nz(row.SPECIES)
 
     observation_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Observation/{observation_id}',
-        'resource': {
-            'resourceType': 'Observation',
-            'id': observation_id,
-            'meta': {'profile': [OBSERVATION_PROFILE]},
-            **({'status': _nz(row.STATUS)} if _nz(row.STATUS) else {'status': 'final'}),
-            'category': [{'coding': [{'system': 'http://terminology.hl7.org/CodeSystem/observation-category', 'code': 'laboratory'}]}],
-            'code': {'coding': [{
-                'system': 'http://loinc.org',
-                'version': LOINC_VERSION,
-                'code': '41852-5',
-                'display': 'Microorganism or agent identified in Specimen',
-            }]},
-            "valueCodeableConcept": {
+        "fullUrl": f"{IGS_SPEC_BASE}/Observation/{observation_id}",
+        "resource": {
+            "resourceType": "Observation",
+            "id": observation_id,
+            "meta": {"profile": [OBSERVATION_PROFILE]},
+            **({"status": _nz(row.STATUS)} if _nz(row.STATUS) else {"status": "final"}),
+            "category": [
+                {
                     "coding": [
                         {
-                            "system": "http://snomed.info/sct",
-                            "version": SNOMED_CT_VERSION,
-                            **({'code': obs_code} if obs_code else {}),
-                            **({'display': obs_display} if obs_display else {})
+                            "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                            "code": "laboratory",
                         }
                     ]
-                },
-            'subject': {'reference': f'Patient/{patient_id}'},
-            'interpretation': [{'coding': [{'system': 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation', 'code': 'POS'}]}],
-            'method': {'coding': [{
-                'system': 'http://snomed.info/sct',
-                'version': SNOMED_CT_VERSION,
-                'code': '1304162005',
-                'display': 'Nucleic acid sequencing technique (qualifier value)'
-            }]},
-            'specimen': {'reference': f'Specimen/{specimen_id}'},
-            'device': {'reference': f'Device/{device_id}'},
-            'derivedFrom': [{'reference': f'MolecularSequence/{sequence_id}'}]
-        }
+                }
+            ],
+            "code": {
+                "coding": [
+                    {
+                        "system": "http://loinc.org",
+                        "version": LOINC_VERSION,
+                        "code": "41852-5",
+                        "display": "Microorganism or agent identified in Specimen",
+                    }
+                ]
+            },
+            "valueCodeableConcept": {
+                "coding": [
+                    {
+                        "system": "http://snomed.info/sct",
+                        "version": SNOMED_CT_VERSION,
+                        **({"code": obs_code} if obs_code else {}),
+                        **({"display": obs_display} if obs_display else {}),
+                    }
+                ]
+            },
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "interpretation": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                            "code": "POS",
+                        }
+                    ]
+                }
+            ],
+            "method": {
+                "coding": [
+                    {
+                        "system": "http://snomed.info/sct",
+                        "version": SNOMED_CT_VERSION,
+                        "code": "1304162005",
+                        "display": "Nucleic acid sequencing technique (qualifier value)",
+                    }
+                ]
+            },
+            "specimen": {"reference": f"Specimen/{specimen_id}"},
+            "device": {"reference": f"Device/{device_id}"},
+            "derivedFrom": [{"reference": f"MolecularSequence/{sequence_id}"}],
+        },
     }
 
     # --- DiagnosticReport ---
     dr_code = _nz(row.MELDETATBESTAND)
 
     diagnostic_report_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/DiagnosticReport/{diagnostic_report_id}',
-        'resource': {
-            'resourceType': 'DiagnosticReport',
-            'id': diagnostic_report_id,
-            'meta': {'profile': [DIAGNOSTIC_REPORT_PROFILE]},
-            'status': 'final',
-            'code': {'coding': [{
-                'system': NOTIFICATION_CATEGORY_SYSTEM,
-                **({'code': dr_code} if dr_code else {})
-            }]},
-            'subject': {'reference': f'Patient/{patient_id}'},
-            'issued': now_iso,
-            'result': [{'reference': f'Observation/{observation_id}'}],
-            'conclusion': 'NACHWEIS eines meldepflichtigen Erregers',
-            'conclusionCode': [{
-                'coding': [{
-                    'system': CONCLUSION_CODE_SYSTEM,
-                    'code': 'pathogenDetected',
-                    'display': 'Meldepflichtiger Erreger nachgewiesen'
-                }]
-            }]
-        }
+        "fullUrl": f"{IGS_SPEC_BASE}/DiagnosticReport/{diagnostic_report_id}",
+        "resource": {
+            "resourceType": "DiagnosticReport",
+            "id": diagnostic_report_id,
+            "meta": {"profile": [DIAGNOSTIC_REPORT_PROFILE]},
+            "status": "final",
+            "code": {
+                "coding": [
+                    {
+                        "system": NOTIFICATION_CATEGORY_SYSTEM,
+                        **({"code": dr_code} if dr_code else {}),
+                    }
+                ]
+            },
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "issued": now_iso,
+            "result": [{"reference": f"Observation/{observation_id}"}],
+            "conclusion": "NACHWEIS eines meldepflichtigen Erregers",
+            "conclusionCode": [
+                {
+                    "coding": [
+                        {
+                            "system": CONCLUSION_CODE_SYSTEM,
+                            "code": "pathogenDetected",
+                            "display": "Meldepflichtiger Erreger nachgewiesen",
+                        }
+                    ]
+                }
+            ],
+        },
     }
 
     # --- Composition ---
     composition_entry = {
-        'fullUrl': f'{IGS_SPEC_BASE}/Composition/{notification_id}',
-        'resource': {
-            'resourceType': 'Composition',
-            'id': notification_id,
-            'meta': {'profile': [NOTIFICATION_PROFILE]},
-            'identifier': {
-                'system': NOTIFICATION_ID_SYSTEM,
-                'value': notification_id
-            },
-            **({'status': _nz(row.STATUS)} if _nz(row.STATUS) else {'status': 'final'}),
-            'type': {'coding': [{'system': 'http://loinc.org', 'code': '34782-3', 'display': 'Infectious disease Note'}]},
-            'category': [{'coding': [{'system': 'http://loinc.org', 'code': '11502-2', 'display': 'Laboratory report'}]}],
-            'subject': {'reference': f'Patient/{patient_id}'},
-            'author': [{'reference': f'PractitionerRole/{practitioner_role_id}'}],
-            'relatesTo': [{
-                'code': 'appends',
-                'targetReference': {
-                    'type': 'Composition',
-                    'identifier': {
-                        'system': NOTIFICATION_ID_SYSTEM,
-                        'value': referenced_notification_id
+        "fullUrl": f"{IGS_SPEC_BASE}/Composition/{notification_id}",
+        "resource": {
+            "resourceType": "Composition",
+            "id": notification_id,
+            "meta": {"profile": [NOTIFICATION_PROFILE]},
+            "identifier": {"system": NOTIFICATION_ID_SYSTEM, "value": notification_id},
+            **({"status": _nz(row.STATUS)} if _nz(row.STATUS) else {"status": "final"}),
+            "type": {
+                "coding": [
+                    {
+                        "system": "http://loinc.org",
+                        "code": "34782-3",
+                        "display": "Infectious disease Note",
                     }
+                ]
+            },
+            "category": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://loinc.org",
+                            "code": "11502-2",
+                            "display": "Laboratory report",
+                        }
+                    ]
                 }
-            }],
-            'date': now_iso,
-            'title': 'Sequenzmeldung',
-            'section': [{
-                'code': {'coding': [{'system': 'http://loinc.org', 'code': '11502-2', 'display': 'Laboratory report'}]},
-                'entry': [{'reference': f'DiagnosticReport/{diagnostic_report_id}'}]
-            }]
-        }
+            ],
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "author": [{"reference": f"PractitionerRole/{practitioner_role_id}"}],
+            "relatesTo": [
+                {
+                    "code": "appends",
+                    "targetReference": {
+                        "type": "Composition",
+                        "identifier": {
+                            "system": NOTIFICATION_ID_SYSTEM,
+                            "value": referenced_notification_id,
+                        },
+                    },
+                }
+            ],
+            "date": now_iso,
+            "title": "Sequenzmeldung",
+            "section": [
+                {
+                    "code": {
+                        "coding": [
+                            {
+                                "system": "http://loinc.org",
+                                "code": "11502-2",
+                                "display": "Laboratory report",
+                            }
+                        ]
+                    },
+                    "entry": [
+                        {"reference": f"DiagnosticReport/{diagnostic_report_id}"}
+                    ],
+                }
+            ],
+        },
     }
 
     # --- Bundle-Entries ---
     entries = [
         composition_entry,
         patient_entry,
-        practitioner_role_entry,   # NotifierRole
-        org_entry,                 # NotifierFacility
-        *( [submitting_role_entry] if submitting_role_entry else [] ),
-        *( [submitting_org_entry] if submitting_org_entry else [] ),
+        practitioner_role_entry,  # NotifierRole
+        org_entry,  # NotifierFacility
+        *([submitting_role_entry] if submitting_role_entry else []),
+        *([submitting_org_entry] if submitting_org_entry else []),
         specimen_entry,
         device_entry,
         *adapter_entries,
-        *( [primer_entry] if primer_entry else [] ),
+        *([primer_entry] if primer_entry else []),
         molecular_sequence_entry,
         observation_entry,
-        diagnostic_report_entry
+        diagnostic_report_entry,
     ]
 
     bundle = {
-        'resourceType': 'Bundle',
-        'meta': {
-            'lastUpdated': now_iso,
-            'profile': [NOTIFICATION_BUNDLE_PROFILE]
+        "resourceType": "Bundle",
+        "meta": {"lastUpdated": now_iso, "profile": [NOTIFICATION_BUNDLE_PROFILE]},
+        "identifier": {
+            "system": NOTIFICATION_BUNDLE_ID_SYSTEM,
+            "value": notification_bundle_id,
         },
-        'identifier': {
-            'system': NOTIFICATION_BUNDLE_ID_SYSTEM,
-            'value': notification_bundle_id
-        },
-        'type': 'document',
-        'timestamp': now_iso,
-        'entry': entries
+        "type": "document",
+        "timestamp": now_iso,
+        "entry": entries,
     }
 
     return _prune(bundle)
 
 
-def send_notification(api: ApiClient, fhir_base_url: str, row: CsvRow, doc_ids: list[str]) -> dict:
+def send_notification(
+    api: ApiClient, fhir_base_url: str, row: CsvRow, doc_ids: list[str]
+) -> dict:
     bundle = build_notification_bundle(
-        base_url_path=fhir_base_url,
-        row=row,
-        doc_ids=doc_ids
+        base_url_path=fhir_base_url, row=row, doc_ids=doc_ids
     )
-    
+
     return api.post_igs_bundle(
         bundle=bundle,
     )

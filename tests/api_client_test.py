@@ -80,9 +80,7 @@ def test_document_reference_and_upload_endpoints(test_settings):
         ),
         mock.call(
             method="GET",
-            endpoint=(
-                "/S3Controller/upload/document-1/s3-upload-info"
-            ),
+            endpoint=("/S3Controller/upload/document-1/s3-upload-info"),
             params={"fileSize": 2048},
         ),
     ]

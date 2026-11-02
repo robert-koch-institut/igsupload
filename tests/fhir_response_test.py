@@ -44,9 +44,7 @@ def test_operation_outcome_is_parsed_and_saved(tmp_path):
 
     assert parsed.is_operation_outcome is True
     assert parsed.issues[0].diagnostics == "threeDigitPostalCode failed"
-    assert parsed.issues[0].paths == (
-        "Bundle.entry[1].resource.address[0].postalCode",
-    )
+    assert parsed.issues[0].paths == ("Bundle.entry[1].resource.address[0].postalCode",)
     assert saved_path is not None
     assert json.loads(saved_path.read_text(encoding="utf-8")) == payload
     assert saved_path.stat().st_mode & 0o777 == 0o600

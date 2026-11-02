@@ -55,7 +55,10 @@ def parse_fhir_response(response: Any) -> FhirResponse:
         payload = None
 
     issues: tuple[OperationOutcomeIssue, ...] = ()
-    if isinstance(payload, Mapping) and payload.get("resourceType") == "OperationOutcome":
+    if (
+        isinstance(payload, Mapping)
+        and payload.get("resourceType") == "OperationOutcome"
+    ):
         raw_issues = payload.get("issue")
         if isinstance(raw_issues, list):
             issues = tuple(
@@ -249,8 +252,4 @@ def _optional_string(value: Any) -> str | None:
 def _string_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
-    return tuple(
-        text
-        for item in value
-        if (text := _optional_string(item)) is not None
-    )
+    return tuple(text for item in value if (text := _optional_string(item)) is not None)

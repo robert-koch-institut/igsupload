@@ -10,7 +10,7 @@ from igsupload.utils.colored_rich_handler import ColoredRichHandler
 
 def setup_logging(log_dir: Path | None = None) -> Path:
     log_dir = setup_path(log_dir)
-    
+
     logger = logging.getLogger("igsupload")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
@@ -40,10 +40,7 @@ def setup_logging(log_dir: Path | None = None) -> Path:
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] "
-            "[%(name)s] %(message)s"
-        )
+        logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s")
     )
 
     logger.addHandler(console_handler)

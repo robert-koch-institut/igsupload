@@ -6,9 +6,7 @@ import requests
 from igsupload.config import REQUIRED_KEYS, Settings
 from igsupload.utils.extract_csv import CsvRow
 
-TEST_BASE_URL = (
-    "https://test.demis.rki.de/qs/surveillance/notification-sequence"
-)
+TEST_BASE_URL = "https://test.demis.rki.de/qs/surveillance/notification-sequence"
 TEST_TOKEN_URL = "https://token.test.invalid/oauth/token"
 
 
@@ -60,9 +58,7 @@ def csv_row_factory():
                 "SPECIES_CODE": "3092008",
                 "SPECIES": "Staphylococcus aureus",
                 "LAB_SEQUENCE_ID": "sample-1",
-                "DEMIS_NOTIFICATION_ID": (
-                    "6cb7099d-8d53-4ee4-96ca-c55761b347d4"
-                ),
+                "DEMIS_NOTIFICATION_ID": ("6cb7099d-8d53-4ee4-96ca-c55761b347d4"),
                 "STATUS": "final",
                 "DATE_OF_SAMPLING": "2025-01-01",
                 "DATE_OF_RECEIVING": "2025-01-02",

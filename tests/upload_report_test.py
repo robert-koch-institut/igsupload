@@ -39,7 +39,9 @@ def test_finish_row_records_final_result_and_duration(tmp_path, monkeypatch):
     report.initialize_rows([(1, ["sample.fastq"])])
 
     times = iter([10.0, 12.345])
-    monkeypatch.setattr("igsupload.log.upload_report.time.monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        "igsupload.log.upload_report.time.monotonic", lambda: next(times)
+    )
     report.start_row(1)
     report.finish_row(1, status="SUCCESS", message="done")
 

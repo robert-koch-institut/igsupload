@@ -66,9 +66,7 @@ def test_bundle_contains_core_profiles_and_resolvable_references(
 
     assert bundle["meta"]["profile"] == [NOTIFICATION_BUNDLE_PROFILE]
     assert bundle["entry"][0]["resource"]["resourceType"] == "Composition"
-    assert resource(bundle, "Composition")["meta"]["profile"] == [
-        NOTIFICATION_PROFILE
-    ]
+    assert resource(bundle, "Composition")["meta"]["profile"] == [NOTIFICATION_PROFILE]
     assert resource(bundle, "Patient")["meta"]["profile"] == [
         NOTIFIED_PERSON_ANONYMOUS_PROFILE
     ]
@@ -76,9 +74,7 @@ def test_bundle_contains_core_profiles_and_resolvable_references(
     assert resource(bundle, "MolecularSequence")["meta"]["profile"] == [
         MOLECULAR_SEQUENCE_PROFILE
     ]
-    assert resource(bundle, "Observation")["meta"]["profile"] == [
-        OBSERVATION_PROFILE
-    ]
+    assert resource(bundle, "Observation")["meta"]["profile"] == [OBSERVATION_PROFILE]
     assert resource(bundle, "DiagnosticReport")["meta"]["profile"] == [
         DIAGNOSTIC_REPORT_PROFILE
     ]
@@ -88,9 +84,7 @@ def test_bundle_contains_core_profiles_and_resolvable_references(
         for entry in bundle["entry"]
     }
     relative_references = {
-        reference
-        for reference in collect_references(bundle)
-        if "://" not in reference
+        reference for reference in collect_references(bundle) if "://" not in reference
     }
     assert relative_references <= available
 
@@ -114,9 +108,7 @@ def test_one_or_two_document_references_are_supported(csv_row_factory):
         if extension["url"] == SEQUENCE_DOCUMENT_REFERENCE_EXTENSION
     ]
 
-    assert references == [
-        f"{TEST_BASE_URL}/v5/fhir/DocumentReference/document-1"
-    ]
+    assert references == [f"{TEST_BASE_URL}/v5/fhir/DocumentReference/document-1"]
 
 
 @pytest.mark.parametrize("doc_ids", [[], ["one", "two", "three"]])
@@ -138,9 +130,9 @@ def test_notification_identifiers_are_distinct(csv_row_factory):
         "value": REFERENCED_NOTIFICATION_ID,
     }
     assert bundle_id["system"] == NOTIFICATION_BUNDLE_ID_SYSTEM
-    assert len(
-        {notification_id["value"], referenced_id["value"], bundle_id["value"]}
-    ) == 3
+    assert (
+        len({notification_id["value"], referenced_id["value"], bundle_id["value"]}) == 3
+    )
 
 
 def test_adapters_and_primer_are_represented_as_substances(csv_row_factory):
