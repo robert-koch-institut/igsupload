@@ -6,6 +6,7 @@ import requests
 from igsupload.api import client as client_module
 from igsupload.api.client import ApiClient
 from igsupload.auth.bearer_auth import BearerAuth
+from igsupload.auth.load_cert import RkiSession
 
 
 def create_client(test_settings):
@@ -13,8 +14,8 @@ def create_client(test_settings):
     return ApiClient(
         base_url=test_settings.base_url,
         token_provider=token_provider,
-        cert_path=test_settings.cert,
-        key_path=test_settings.key,
+        pkcs12_path=test_settings.pkcs12_path,
+        password=test_settings.key,
     )
 
 
@@ -22,7 +23,7 @@ def test_client_configures_session_for_demis(test_settings):
     client = create_client(test_settings)
 
     assert isinstance(client._session.auth, BearerAuth)
-    assert client._session.cert == (test_settings.cert, test_settings.key)
+    assert client._session == RkiSession(test_settings.pkcs12_path, test_settings.password)
     assert client._session.headers["Content-Type"] == "application/fhir+json"
     assert client._session.headers["Accept"] == "application/fhir+json"
     client.close()

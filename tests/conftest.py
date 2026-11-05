@@ -16,8 +16,8 @@ TEST_TOKEN_URL = "https://token.test.invalid/oauth/token"
 def fixed_test_environment(monkeypatch):
     """Keep unit tests independent from a developer's local .env file."""
     values = {
-        "CERT_URL": "/tmp/test-cert.pem",
-        "KEY_URL": "/tmp/test-key.pem",
+        "PKCS12_PATH": "/tmp/test-pkcs12.p12",
+        "PASSWORD": "password",
         "CLIENT_ID": "test-client",
         "CLIENT_SECRET": "test-secret",
         "USERNAME": "test-user",
@@ -40,8 +40,8 @@ def fixed_test_environment(monkeypatch):
 @pytest.fixture
 def test_settings() -> Settings:
     return Settings(
-        cert="/tmp/test-cert.pem",
-        key="/tmp/test-key.pem",
+        pkcs12_path="/tmp/test-pkcs12.p12",
+        password="password",
         client_id="test-client",
         client_secret="test-secret",
         username="test-user",

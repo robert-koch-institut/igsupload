@@ -4,6 +4,7 @@ from typing import Any
 
 import requests
 
+from igsupload.auth.load_cert import RkiSession
 from igsupload.auth.bearer_auth import BearerAuth
 from igsupload.auth.token_provider import TokenProvider
 from igsupload.utils.split_file import split_file_in_chunks
@@ -12,13 +13,12 @@ logger = logging.getLogger(__name__)
 
 class ApiClient:
     # client to communicate with demis api
-    def __init__(self, base_url:str, token_provider:TokenProvider, cert_path:str, key_path:str):
+    def __init__(self, base_url:str, token_provider:TokenProvider, pkcs12_path:str, password:str):
         self.base_url = base_url
         self.token_provider = token_provider
 
-        self._session = requests.Session()
+        self._session = RkiSession(pkcs12_path=pkcs12_path, password=password)
         self._session.auth = BearerAuth(token_provider)
-        self._session.cert = (cert_path, key_path)
         self._session.headers.update({
             "Content-Type": "application/fhir+json",
             "Accept": "application/fhir+json",

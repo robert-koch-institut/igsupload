@@ -15,8 +15,8 @@ def test_default_configuration_uses_fixed_test_environment():
 def test_explicit_test_config_is_loaded(tmp_path):
     config_path = tmp_path / ".env.test"
     config_path.write_text(
-        "CERT_URL=/test/cert.pem\n"
-        "KEY_URL=/test/key.pem\n"
+        "PKCS12_PATH=/tmp/test-pkcs12.p12\n"
+        "PASSWORD=password\n"
         "CLIENT_ID=file-client\n"
         "CLIENT_SECRET=file-secret\n"
         "USERNAME=file-user\n"
@@ -28,7 +28,7 @@ def test_explicit_test_config_is_loaded(tmp_path):
     settings = load_env(config_path)
 
     assert settings.base_url == TEST_BASE_URL
-    assert settings.cert == "/test/cert.pem"
+    assert settings.pkcs12_path == "/tmp/test-pkcs12.p12"
     assert settings.client_secret == "file-secret"
 
 

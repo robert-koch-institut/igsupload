@@ -1,9 +1,9 @@
-import threading
 import time
 
 import requests
 
 from igsupload.config import Settings
+from igsupload.auth.load_cert import RkiSession
 
 
 class TokenProvider:
@@ -15,7 +15,8 @@ class TokenProvider:
 
         self._refresh_at: float = 0.0
         self._refresh_expires_at: float = 0.0
-        self._lock = threading.Lock()
+
+        self._session = RkiSession(pkcs12_path=settings.pkcs12_path, password=settings.password)
 
 
     def _fetch_token(self) -> None:
@@ -37,10 +38,9 @@ class TokenProvider:
 
         requested_at = time.monotonic()
 
-        response = requests.post(
+        response = self._session.post(
             url=self._settings.token_url,
             data=data,
-            cert=(self._settings.cert, self._settings.key),
             timeout=15,
         )
 
@@ -76,14 +76,13 @@ class TokenProvider:
         )
 
     def get_token(self) -> str:
-        with self._lock:
-            if (
-                self._access_token is None
-                or time.monotonic() >= self._refresh_at
-            ):
-                self._fetch_token()
+        if (
+            self._access_token is None
+            or time.monotonic() >= self._refresh_at
+        ):
+            self._fetch_token()
 
-            if self._access_token is None:
-                raise RuntimeError("No access token available")
+        if self._access_token is None:
+            raise RuntimeError("No access token available")
 
-            return self._access_token
+        return self._access_token
