@@ -18,7 +18,6 @@ class TokenProvider:
 
         self._session = RkiSession(pkcs12_path=settings.pkcs12_path, password=settings.password)
 
-
     def _fetch_token(self) -> None:
         can_refresh = (
             self._refresh_token is not None
@@ -66,14 +65,10 @@ class TokenProvider:
         self._refresh_token = refresh_token
 
         # Refresh access token 60 seconds before expiration
-        self._refresh_at = requested_at + max(
-            0, expires_in - 60
-        )
+        self._refresh_at = requested_at + max(0, expires_in - 60)
 
         # Refresh token expiration with 30s safety margin
-        self._refresh_expires_at = (
-            requested_at + refresh_expires_in
-        )
+        self._refresh_expires_at = requested_at + refresh_expires_in
 
     def get_token(self) -> str:
         if (

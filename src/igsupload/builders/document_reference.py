@@ -16,25 +16,22 @@ def get_demis_content_type(file_name):
     elif file_name.endswith((".fasta.gz", ".fa.gz")):
         return "chemical/seq-na-fasta-gzip"
     else:
-        raise ValueError(f"{typer.style('Invalid', fg=typer.colors.RED)} fileformat: {file_name}")
-
+        raise ValueError(
+            f"{typer.style('Invalid', fg=typer.colors.RED)} fileformat: {file_name}"
+        )
 
 
 def build_document_reference(file_name, sha256_hash):
     return {
         "resourceType": "DocumentReference",
         "status": "current",
-        "meta": {
-            "profile": [
-                SEQUENCE_DOCUMENT_PROFILE
-            ]
-        },
+        "meta": {"profile": [SEQUENCE_DOCUMENT_PROFILE]},
         "type": {
             "coding": [
                 {
                     "system": "http://snomed.info/sct",
                     "code": "41482005",
-                    "display": "Molecular sequence data (finding)"
+                    "display": "Molecular sequence data (finding)",
                 }
             ]
         },
@@ -45,8 +42,8 @@ def build_document_reference(file_name, sha256_hash):
                 "attachment": {
                     "contentType": get_demis_content_type(file_name),
                     "title": file_name,
-                    "hash": sha256_hash
+                    "hash": sha256_hash,
                 }
             }
-        ]
+        ],
     }

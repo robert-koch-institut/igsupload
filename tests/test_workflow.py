@@ -104,9 +104,7 @@ def test_successful_row_uploads_files_and_writes_response_ids(
     )
     (reads_dir / "sample_R1.fq.gz").write_bytes(b"read-1")
     (reads_dir / "sample_R2.fq.gz").write_bytes(b"read-2")
-    send_notification = mock.Mock(
-        return_value=FakeResponse(payload=response_payload())
-    )
+    send_notification = mock.Mock(return_value=FakeResponse(payload=response_payload()))
     monkeypatch.setattr(workflow, "send_notification", send_notification)
     report = UploadReport(logs_dir, csv_path)
 

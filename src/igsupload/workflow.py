@@ -17,6 +17,7 @@ from igsupload.utils.sha256_hash import create_hash
 
 logger = logging.getLogger(__name__)
 
+
 def start(
     csv_path: Path,
     fhir_base_url: str,
@@ -82,13 +83,9 @@ def start(
                     message=f"Checking sequence file {file_name}",
                 )
 
-                reads_directory = (
-                    csv_path.parent.parent / "reads" 
-                ).resolve()
+                reads_directory = (csv_path.parent.parent / "reads").resolve()
 
-                file_path = ( 
-                    reads_directory / file_name 
-                ).resolve()
+                file_path = (reads_directory / file_name).resolve()
 
                 logger.info(f"Processing file: {file_name}")
 
@@ -100,7 +97,6 @@ def start(
                 if not file_path.is_file():
                     raise FileNotFoundError(f"Sequence file not found: {file_path}")
 
-                
                 current_stage = "HASHING"
                 report.update_row(
                     row_number=row_number,
@@ -149,18 +145,14 @@ def start(
                 upload_info = api.get_presigned_url(doc_id, size)
 
                 if not isinstance(upload_info, dict):
-                    raise TypeError(
-                        f"Invalid upload information for {file_name}"
-                    )
+                    raise TypeError(f"Invalid upload information for {file_name}")
 
                 upload_id = upload_info.get("uploadId")
                 urls = upload_info.get("presignedUrls")
                 part_size = upload_info.get("partSizeBytes")
 
                 if not upload_id or not urls or not part_size:
-                    raise RuntimeError(
-                        f"Incomplete upload information for {file_name}"
-                    )
+                    raise RuntimeError(f"Incomplete upload information for {file_name}")
 
                 upload_ids.append(upload_id)
                 report.update_row(
@@ -176,13 +168,10 @@ def start(
                     upload_id,
                 )
                 completed_chunks = (
-                    complete_body.get("completedChunks", [])
-                    if complete_body
-                    else []
+                    complete_body.get("completedChunks", []) if complete_body else []
                 )
-                chunks_complete = (
-                    len(completed_chunks) == len(urls)
-                    and all(chunk.get("eTag") for chunk in completed_chunks)
+                chunks_complete = len(completed_chunks) == len(urls) and all(
+                    chunk.get("eTag") for chunk in completed_chunks
                 )
 
                 if not chunks_complete:
@@ -202,9 +191,7 @@ def start(
 
                 validation_started = api.post_start_validation(doc_id)
                 if not validation_started:
-                    raise RuntimeError(
-                        f"Failed to start validation for {file_name}"
-                    )
+                    raise RuntimeError(f"Failed to start validation for {file_name}")
 
                 validation_result = wait_for_validation(api, doc_id)
                 validation_status = validation_result.get("status", "UNKNOWN")
@@ -213,16 +200,12 @@ def start(
                 report.update_row(
                     row_number=row_number,
                     validation_statuses=validation_statuses,
-                    message=(
-                        f"Validation status for {file_name}: "
-                        f"{validation_status}"
-                    ),
+                    message=(f"Validation status for {file_name}: {validation_status}"),
                 )
 
                 if validation_status != "VALID":
                     raise ValueError(
-                        f"Validation failed for {file_name}: "
-                        f"{validation_status}"
+                        f"Validation failed for {file_name}: {validation_status}"
                     )
 
                 logger.info(
@@ -231,9 +214,7 @@ def start(
                 )
 
             if not 1 <= len(document_reference_ids) <= 2:
-                raise ValueError(
-                    "One or two sequence files must complete validation"
-                )
+                raise ValueError("One or two sequence files must complete validation")
 
             current_stage = "NOTIFICATION"
             report.update_row(
@@ -297,11 +278,7 @@ def start(
                 "transaction_id": transaction_id,
                 "lab_sequence_id": lab_sequence_id,
             }
-            missing_ids = [
-                name
-                for name, value in response_ids.items()
-                if not value
-            ]
+            missing_ids = [name for name, value in response_ids.items() if not value]
 
             if missing_ids:
                 run_successful = False
@@ -339,7 +316,7 @@ def start(
                     extra={"color": "green"},
                 )
 
-        except Exception as exc: # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             run_successful = False
             response = getattr(exc, "response", None)
 
@@ -374,8 +351,9 @@ def start(
     return run_successful
 
 
-
-def wait_for_validation(api: ApiClient, doc_id: str, max_wait_seconds: int = 300) -> dict:
+def wait_for_validation(
+    api: ApiClient, doc_id: str, max_wait_seconds: int = 300
+) -> dict:
     deadline = time.monotonic() + max_wait_seconds
     start_time = time.time()
 
@@ -393,6 +371,4 @@ def wait_for_validation(api: ApiClient, doc_id: str, max_wait_seconds: int = 300
 
         time.sleep(2)
 
-    raise TimeoutError(
-        f"Validation timed out for document {doc_id}"
-    )
+    raise TimeoutError(f"Validation timed out for document {doc_id}")

@@ -34,20 +34,14 @@ def load_env(path: Path | None = None) -> Settings:
         path = path.expanduser().resolve()
 
         if not path.is_file():
-            raise FileNotFoundError(
-                f"Configuration file not found: {path}"
-            )
+            raise FileNotFoundError(f"Configuration file not found: {path}")
 
         load_dotenv(path, override=True)
     else:
         load_dotenv()
 
-    
     # Check if all required environment variables exist
-    missing_keys = [
-        key for key in REQUIRED_KEYS
-        if not os.getenv(key)
-    ]
+    missing_keys = [key for key in REQUIRED_KEYS if not os.getenv(key)]
     if missing_keys:
         raise ValueError(
             f"Missing configuration values: {', '.join(missing_keys)}"

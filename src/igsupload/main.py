@@ -14,6 +14,7 @@ from igsupload.workflow import start
 app = typer.Typer(add_completion=False)
 logger = logging.getLogger(__name__)
 
+
 @app.command("intro")
 def help_cmd():
     """
@@ -21,8 +22,12 @@ def help_cmd():
     """
     typer.echo("\nIGS Uploader - Help & Troubleshooting\n")
     typer.echo("Usage:")
-    typer.echo("  igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]")
-    typer.echo("Normally the application searches for the .env-file inside the root folder.\nOnly set a different logging path, if you don't want the logs to be in the ./logging folder inside the project directory.\n")
+    typer.echo(
+        "  igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]"
+    )
+    typer.echo(
+        "Normally the application searches for the .env-file inside the root folder.\nOnly set a different logging path, if you don't want the logs to be in the ./logging folder inside the project directory.\n"
+    )
     typer.echo("Typical problems and solutions:")
     typer.echo("1) ProxyError or 403 Forbidden")
     typer.echo("   → Your environment blocks requests to the DEMIS test environment.")
@@ -30,7 +35,9 @@ def help_cmd():
     typer.echo("2) file not found")
     typer.echo("   → CSV path must exist locally.")
     typer.echo("   → Expected structure:")
-    typer.echo("    my-dataset/\n    ├── metadata/\n    │   └── data.csv\n    └── reads/\n        ├── Sample1_R1.fastq\n        ├── Sample1_R2.fastq\n        └── ...\n")
+    typer.echo(
+        "    my-dataset/\n    ├── metadata/\n    │   └── data.csv\n    └── reads/\n        ├── Sample1_R1.fastq\n        ├── Sample1_R2.fastq\n        └── ...\n"
+    )
     typer.echo("3) Validation failed: Hash does not match")
     typer.echo("   → File changed after hashing or repacked.\n")
     typer.echo("4) Invalid files")
@@ -41,19 +48,29 @@ def help_cmd():
     typer.echo("  igsupload intro\n")
 
 
-
-
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
     csv: Path | None = typer.Option(
-        None, "--csv", help="Path to metadata CSV file", exists=False, show_default=False
+        None,
+        "--csv",
+        help="Path to metadata CSV file",
+        exists=False,
+        show_default=False,
     ),
     config_path: Path | None = typer.Option(
-        None, "--config", help="Optional path to a .env file (overrides auto-detection)", exists=False, show_default=False
+        None,
+        "--config",
+        help="Optional path to a .env file (overrides auto-detection)",
+        exists=False,
+        show_default=False,
     ),
     log_path: Path | None = typer.Option(
-        None, "--log", help="Optional path to a log file. If not set it will be put into the logging/ dircetory", exists=False, show_default=False
+        None,
+        "--log",
+        help="Optional path to a log file. If not set it will be put into the logging/ dircetory",
+        exists=False,
+        show_default=False,
     ),
 ):
     """
@@ -67,7 +84,9 @@ def main(
 
     if csv is None:
         logger.error("--csv is required.")
-        logger.info("Use: igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]")
+        logger.info(
+            "Use: igsupload --csv /path/to/metadata.csv [--config /path/to/.env] [--log /path/to/log.csv]"
+        )
         raise typer.Exit(code=2)
 
     # load config
@@ -79,7 +98,6 @@ def main(
         logger.error(f"Configuration error: {e}")
         raise typer.Exit(code=2)
 
-    
     # check for CSV file
     logger.info("Loading CSV file")
     csv_path = csv.expanduser().resolve()
@@ -89,7 +107,6 @@ def main(
         raise typer.Exit(code=2)
     logger.info("CSV file found", extra={"color": "green"})
 
-    
     token_provider = TokenProvider(cfg)
     api = ApiClient(
         base_url=cfg.base_url,
@@ -97,7 +114,6 @@ def main(
         pkcs12_path=cfg.pkcs12_path,
         password=cfg.password,
     )
-
 
     try:
         report = UploadReport(
@@ -109,9 +125,7 @@ def main(
         logger.info("Final upload report: %s", report.file_path)
 
         if not run_successful:
-            logger.error(
-                "The upload finished with failed or incomplete rows."
-            )
+            logger.error("The upload finished with failed or incomplete rows.")
             raise typer.Exit(code=1)
 
     except requests.HTTPError as exc:
@@ -137,7 +151,6 @@ def main(
             type(exc).__name__,
         )
         raise typer.Exit(code=1) from exc
-
 
     except OSError as exc:
         logger.error(f"File operation failed: {exc}")
