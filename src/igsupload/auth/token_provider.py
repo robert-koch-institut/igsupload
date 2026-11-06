@@ -3,7 +3,7 @@ import time
 import requests
 
 from igsupload.config import Settings
-from igsupload.auth.load_cert import RkiSession
+from igsupload.auth.load_cert import Pkcs12ClientCertSession
 
 
 class TokenProvider:
@@ -16,7 +16,7 @@ class TokenProvider:
         self._refresh_at: float = 0.0
         self._refresh_expires_at: float = 0.0
 
-        self._session = RkiSession(pkcs12_path=settings.pkcs12_path, password=settings.password)
+        self._session = Pkcs12ClientCertSession(pkcs12_path=settings.pkcs12_path, password=settings.password)
 
     def _fetch_token(self) -> None:
         can_refresh = (

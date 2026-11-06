@@ -1,13 +1,10 @@
 import os
-import platform
 import datetime
 import secrets
 import tempfile
 import requests
 
 from urllib3.util import create_urllib3_context
-from getpass import getpass
-from pathlib import Path
 from cryptography.hazmat.primitives.serialization import (
     BestAvailableEncryption,
     pkcs12,
@@ -28,34 +25,32 @@ def _create_sslcontext(pkcs12_data, pkcs12_password_bytes):
     _check_cert_not_after(cert)
     ssl_context = create_urllib3_context()
     ssl_context.load_default_certs()
-    with tempfile.NamedTemporaryFile(delete=False) as c:
+    with tempfile.NamedTemporaryFile(delete=False) as temp_cert_file:
         try:
             tmp_pkcs12_password_bytes = secrets.token_bytes(128//8)
-            pk_buf = private_key.private_bytes(
+            key_pem = private_key.private_bytes(
                 Encoding.PEM,
                 PrivateFormat.PKCS8,
                 BestAvailableEncryption(password=tmp_pkcs12_password_bytes)
             )
-            c.write(pk_buf)
-            buf = cert.public_bytes(Encoding.PEM)
-            c.write(buf)
+            temp_cert_file.write(key_pem)
+            cert_pem = cert.public_bytes(Encoding.PEM)
+            temp_cert_file.write(cert_pem)
             if ca_certs:
                 for ca_cert in ca_certs:
                     _check_cert_not_after(ca_cert)
-                    buf = ca_cert.public_bytes(Encoding.PEM)
-                    c.write(buf)
-            c.flush()
-            c.close()
-            ssl_context.load_cert_chain(c.name, password=tmp_pkcs12_password_bytes)
+                    cert_pem = ca_cert.public_bytes(Encoding.PEM)
+                    temp_cert_file.write(cert_pem)
+            temp_cert_file.flush()
+            temp_cert_file.close()
+            ssl_context.load_cert_chain(temp_cert_file.name, password=tmp_pkcs12_password_bytes)
         finally:
-            os.remove(c.name)
+            os.remove(temp_cert_file.name)
     return ssl_context
 
 
 class Pkcs12Adapter(requests.adapters.HTTPAdapter):
-    def __init__(self, *args, **kwargs):
-        pkcs12_path = kwargs.pop('pkcs12_path', None)
-        pkcs12_password = kwargs.pop('password', None)
+    def __init__(self, *args, pkcs12_path: str, password: str, **kwargs):
         
         
         if pkcs12_path is None:
@@ -65,17 +60,15 @@ class Pkcs12Adapter(requests.adapters.HTTPAdapter):
                 pkcs12_data = pkcs12_file.read()
         
         # convert pkcs12 password to none/bytes
-        if pkcs12_password is None:
+        if password is None:
             pkcs12_password_bytes = None
-        elif isinstance(pkcs12_password, bytes):
-            pkcs12_password_bytes = pkcs12_password
-        elif isinstance(pkcs12_password, str):
-            pkcs12_password_bytes = pkcs12_password.encode('utf8')
+        elif isinstance(password, str):
+            pkcs12_password_bytes = password.encode('utf8')
         else:
-            raise TypeError('Password must be a None, string or bytes.')
+            raise TypeError('Password must be None or a string.')
 
         self.ssl_context = _create_sslcontext(pkcs12_data, pkcs12_password_bytes)
-        super(Pkcs12Adapter, self).__init__(*args, **kwargs)
+        super(Pkcs12Adapter, self).__init__(*args, **kwargs) # vllt hier rein
 
     def init_poolmanager(self, *args, **kwargs) -> None:
         """Initialize a urllib3 PoolManager, using the default SSL certificates on Windows."""
@@ -89,8 +82,8 @@ class Pkcs12Adapter(requests.adapters.HTTPAdapter):
         return super(Pkcs12Adapter, self).proxy_manager_for(*args, **kwargs)
 
 
-class RkiSession(requests.Session):
-    def __init__(self, **kwargs) -> None:
+class Pkcs12ClientCertSession(requests.Session):
+    def __init__(self, pkcs12_path: str, password: str, **kwargs) -> None:
         """
         requests.Session subclass that uses the RKI SSL root certificates setup.
 
@@ -100,6 +93,6 @@ class RkiSession(requests.Session):
         super().__init__()
 
         # Pkcs12 Setup
-        self.adapter = Pkcs12Adapter(**kwargs)
+        self.adapter = Pkcs12Adapter(pkcs12_path=pkcs12_path, password=password, **kwargs)
         self.mount("http://", self.adapter)
         self.mount("https://", self.adapter)

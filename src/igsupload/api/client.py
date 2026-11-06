@@ -4,7 +4,7 @@ from typing import Any
 
 import requests
 
-from igsupload.auth.load_cert import RkiSession
+from igsupload.auth.load_cert import Pkcs12ClientCertSession
 from igsupload.auth.bearer_auth import BearerAuth
 from igsupload.auth.token_provider import TokenProvider
 from igsupload.utils.split_file import split_file_in_chunks
@@ -18,7 +18,7 @@ class ApiClient:
         self.base_url = base_url
         self.token_provider = token_provider
 
-        self._session = RkiSession(pkcs12_path=pkcs12_path, password=password)
+        self._session = Pkcs12ClientCertSession(pkcs12_path=pkcs12_path, password=password)
         self._session.auth = BearerAuth(token_provider)
         self._session.headers.update({
             "Content-Type": "application/fhir+json",
