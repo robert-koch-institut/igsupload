@@ -6,37 +6,51 @@ import requests
 from igsupload.api import client as client_module
 from igsupload.api.client import ApiClient
 from igsupload.auth.bearer_auth import BearerAuth
-from igsupload.auth.load_cert import Pkcs12ClientCertSession
 
 
-def create_client(test_settings):
+def create_client(test_settings, monkeypatch):
+    session = mock.Mock()
+    session.headers = {}
+    session_factory = mock.Mock(return_value=session)
+    monkeypatch.setattr(
+        client_module,
+        "Pkcs12ClientCertSession",
+        session_factory,
+    )
+
     token_provider = mock.Mock()
-    return ApiClient(
+    client = ApiClient(
         base_url=test_settings.base_url,
         token_provider=token_provider,
         pkcs12_path=test_settings.pkcs12_path,
-        password=test_settings.key,
+        password=test_settings.password,
     )
+    return client, session, session_factory
 
 
-def test_client_configures_session_for_demis(test_settings):
-    client = create_client(test_settings)
+def test_client_configures_session_for_demis(test_settings, monkeypatch):
+    client, session, session_factory = create_client(test_settings, monkeypatch)
 
-    assert isinstance(client._session.auth, BearerAuth)
-    assert client._session == Pkcs12ClientCertSession(
-        pkcs12_path=test_settings.pkcs12_path, password=test_settings.password
+    session_factory.assert_called_once_with(
+        pkcs12_path=test_settings.pkcs12_path,
+        password=test_settings.password,
     )
-    assert client._session.headers["Content-Type"] == "application/fhir+json"
-    assert client._session.headers["Accept"] == "application/fhir+json"
+    assert client._session is session
+    assert isinstance(session.auth, BearerAuth)
+    assert session.headers["Content-Type"] == "application/fhir+json"
+    assert session.headers["Accept"] == "application/fhir+json"
+
     client.close()
+    session.close.assert_called_once_with()
 
 
-def test_request_uses_base_url_and_raises_for_http_errors(test_settings):
-    client = create_client(test_settings)
+def test_request_uses_base_url_and_raises_for_http_errors(
+    test_settings,
+    monkeypatch,
+):
+    client, session, _ = create_client(test_settings, monkeypatch)
     response = mock.Mock()
-    session = mock.Mock()
     session.request.return_value = response
-    client._session = session
 
     result = client._request(
         "POST",
@@ -56,8 +70,8 @@ def test_request_uses_base_url_and_raises_for_http_errors(test_settings):
     response.raise_for_status.assert_called_once_with()
 
 
-def test_document_reference_and_upload_endpoints(test_settings):
-    client = create_client(test_settings)
+def test_document_reference_and_upload_endpoints(test_settings, monkeypatch):
+    client, _, _ = create_client(test_settings, monkeypatch)
     response = mock.Mock()
     response.json.side_effect = [
         {"id": "document-1"},
@@ -90,8 +104,8 @@ def test_document_reference_and_upload_endpoints(test_settings):
     client.close()
 
 
-def test_upload_lifecycle_and_notification_endpoints(test_settings):
-    client = create_client(test_settings)
+def test_upload_lifecycle_and_notification_endpoints(test_settings, monkeypatch):
+    client, _, _ = create_client(test_settings, monkeypatch)
     response = mock.Mock()
     response.json.return_value = {"done": True, "status": "VALID"}
     request = mock.Mock(return_value=response)
@@ -155,7 +169,7 @@ def test_chunk_upload_streams_parts_and_collects_etags(
         responses.append(response)
     put = mock.Mock(side_effect=responses)
     monkeypatch.setattr(client_module.requests, "put", put)
-    client = create_client(test_settings)
+    client, _, _ = create_client(test_settings, monkeypatch)
 
     result = client.put_file_chunks(
         file_path,
@@ -194,7 +208,7 @@ def test_failed_chunk_upload_raises_http_error(
         "put",
         mock.Mock(return_value=response),
     )
-    client = create_client(test_settings)
+    client, _, _ = create_client(test_settings, monkeypatch)
 
     with pytest.raises(requests.HTTPError, match="upload failed"):
         client.put_file_chunks(file_path, 4, ["url-1"], "upload-1")

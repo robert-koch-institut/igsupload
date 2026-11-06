@@ -19,15 +19,32 @@ def token_response(access_token, refresh_token, expires_in=300):
     return response
 
 
-def test_access_token_is_fetched_once_and_cached(monkeypatch, test_settings):
+@pytest.fixture
+def token_session(monkeypatch):
+    session = mock.Mock()
+    session_factory = mock.Mock(return_value=session)
+    monkeypatch.setattr(
+        token_module,
+        "Pkcs12ClientCertSession",
+        session_factory,
+    )
+    return session, session_factory
+
+
+def test_access_token_is_fetched_once_and_cached(test_settings, token_session):
+    session, session_factory = token_session
     response = token_response("access-1", "refresh-1")
     post = mock.Mock(return_value=response)
-    monkeypatch.setattr(token_module.requests, "post", post)
+    session.post = post
     provider = TokenProvider(test_settings)
 
     assert provider.get_token() == "access-1"
     assert provider.get_token() == "access-1"
 
+    session_factory.assert_called_once_with(
+        pkcs12_path=test_settings.pkcs12_path,
+        password=test_settings.password,
+    )
     post.assert_called_once_with(
         url=test_settings.token_url,
         data={
@@ -36,18 +53,22 @@ def test_access_token_is_fetched_once_and_cached(monkeypatch, test_settings):
             "client_secret": "test-secret",
             "username": "test-user",
         },
-        cert=(test_settings.cert, test_settings.key),
         timeout=15,
     )
     response.raise_for_status.assert_called_once_with()
 
 
-def test_expired_access_token_uses_refresh_token(monkeypatch, test_settings):
+def test_expired_access_token_uses_refresh_token(
+    monkeypatch,
+    test_settings,
+    token_session,
+):
+    session, _ = token_session
     first = token_response("access-1", "refresh-1", expires_in=61)
     second = token_response("access-2", "refresh-2")
     post = mock.Mock(side_effect=[first, second])
-    monotonic_values = iter([100.0, 102.0, 102.0, 102.0])
-    monkeypatch.setattr(token_module.requests, "post", post)
+    monotonic_values = iter([100.0, 101.0, 101.0, 101.0])
+    session.post = post
     monkeypatch.setattr(
         token_module.time,
         "monotonic",
@@ -66,9 +87,10 @@ def test_expired_access_token_uses_refresh_token(monkeypatch, test_settings):
     }
 
 
-def test_invalid_token_lifetime_is_rejected(monkeypatch, test_settings):
+def test_invalid_token_lifetime_is_rejected(test_settings, token_session):
+    session, _ = token_session
     response = token_response("access", "refresh", expires_in=0)
-    monkeypatch.setattr(token_module.requests, "post", mock.Mock(return_value=response))
+    session.post.return_value = response
     provider = TokenProvider(test_settings)
 
     with pytest.raises(ValueError, match="Invalid token lifetime"):
