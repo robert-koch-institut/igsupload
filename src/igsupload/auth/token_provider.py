@@ -1,9 +1,7 @@
 import time
 
-import requests
-
-from igsupload.config import Settings
 from igsupload.auth.load_cert import Pkcs12ClientCertSession
+from igsupload.config import Settings
 
 
 class TokenProvider:
@@ -16,7 +14,9 @@ class TokenProvider:
         self._refresh_at: float = 0.0
         self._refresh_expires_at: float = 0.0
 
-        self._session = Pkcs12ClientCertSession(pkcs12_path=settings.pkcs12_path, password=settings.password)
+        self._session = Pkcs12ClientCertSession(
+            pkcs12_path=settings.pkcs12_path, password=settings.password
+        )
 
     def _fetch_token(self) -> None:
         can_refresh = (
@@ -71,10 +71,7 @@ class TokenProvider:
         self._refresh_expires_at = requested_at + refresh_expires_in
 
     def get_token(self) -> str:
-        if (
-            self._access_token is None
-            or time.monotonic() >= self._refresh_at
-        ):
+        if self._access_token is None or time.monotonic() >= self._refresh_at:
             self._fetch_token()
 
         if self._access_token is None:

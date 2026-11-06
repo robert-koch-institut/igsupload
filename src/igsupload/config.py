@@ -43,9 +43,7 @@ def load_env(path: Path | None = None) -> Settings:
     # Check if all required environment variables exist
     missing_keys = [key for key in REQUIRED_KEYS if not os.getenv(key)]
     if missing_keys:
-        raise ValueError(
-            f"Missing configuration values: {', '.join(missing_keys)}"
-        )
+        raise ValueError(f"Missing configuration values: {', '.join(missing_keys)}")
 
     return Settings(
         pkcs12_path=os.environ.get("PKCS12_PATH"),
