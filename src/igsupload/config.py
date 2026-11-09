@@ -18,7 +18,7 @@ REQUIRED_KEYS = [
 @dataclass(frozen=True)
 class Settings:
     pkcs12_path: str
-    password: str
+    password: str = field(repr=False)
     client_id: str
     client_secret: str = field(repr=False)
     username: str

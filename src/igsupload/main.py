@@ -107,13 +107,17 @@ def main(
         raise typer.Exit(code=2)
     logger.info("CSV file found", extra={"color": "green"})
 
-    token_provider = TokenProvider(cfg)
-    api = ApiClient(
-        base_url=cfg.base_url,
-        token_provider=token_provider,
-        pkcs12_path=cfg.pkcs12_path,
-        password=cfg.password,
-    )
+    try:
+        token_provider = TokenProvider(cfg)
+        api = ApiClient(
+            base_url=cfg.base_url,
+            token_provider=token_provider,
+            pkcs12_path=cfg.pkcs12_path,
+            password=cfg.password,
+        )
+    except (OSError, ValueError, TypeError) as exc:
+        logger.error("Could not load PKCS#12 certificate: %s", exc)
+        raise typer.Exit(code=2) from exc
 
     try:
         report = UploadReport(

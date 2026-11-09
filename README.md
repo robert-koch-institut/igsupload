@@ -35,7 +35,7 @@ This project automates the submission of sequencing data and associated metadata
 4. Generating FHIR DocumentReferences
 5. Uploading sequence files in chunks using presigned URLs
 6. Validation of uploaded files
-7. Creation and transmission of the final IGS notification (FHIR Bundle)
+7. Creation and transmission of the final IGS Notification (FHIR Bundle)
 
 ## Requirements
 
@@ -77,7 +77,7 @@ uv run igsupload --help
 Alternatively, activate the virtual environment to use the `igsupload` command directly:
 
 ```bash
-source .venv/bin/activate
+. .venv/bin/activate
 igsupload --help
 ```
 
@@ -122,7 +122,7 @@ uv run ruff format .
 Modify the .env file with your credentials. Use the **.env.template** file as a template for yours:
 
 ```bash
-PKCS12_PATH="path/to/cert.p12
+PKCS12_PATH="path/to/cert.p12"
 PASSWORD="password"
 
 # more infos regarding the Client_Id and Client_Secret is here:
@@ -137,9 +137,10 @@ TOKEN_URL="https://TOKEN-Base-URL"
 
 ## Usage
 
-Start the upload process:
-With this upload command the application expects a .env file in your root folder
+If you did not activate the virtual Environment you would have to set `uv run` in front of every `igsupload` Command.
 
+Start the upload process:
+With this basic upload command the application expects a .env file in your root folder.
 ```bash
 igsupload --csv /path/to/metadata.csv
 ```

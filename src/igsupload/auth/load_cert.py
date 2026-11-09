@@ -74,7 +74,7 @@ class Pkcs12Adapter(requests.adapters.HTTPAdapter):
             raise TypeError("Password must be None or a string.")
 
         self.ssl_context = _create_sslcontext(pkcs12_data, pkcs12_password_bytes)
-        super().__init__(*args, **kwargs)  # vllt hier rein
+        super().__init__(*args, **kwargs)
 
     def init_poolmanager(self, *args, **kwargs) -> None:
         """Initialize a urllib3 PoolManager, using the default SSL certificates on Windows."""
